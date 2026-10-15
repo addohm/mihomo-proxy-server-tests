@@ -33,3 +33,21 @@ Planned work, not started. Nothing here is being executed yet.
 - **Skip transfers for dead servers** — if the warm-up never got a response, skip download/upload (saves
   ~20 s per dead server; trade-off against the "first connection is slow" problem the warm-up handles).
 - **macOS IPv6 ping** — use `ping6` for IPv6 addresses on macOS.
+- **Speed excluding connection setup** — curl's average speed includes connecting and the TLS handshake,
+  so far-away servers look slower on a 10 MB test. Could compute speed from the transfer phase only
+  (curl's `time_starttransfer`), or just document it.
+- **Label CDN-fronted servers** — for servers behind a CDN (e.g. ws+tls via Cloudflare) the ping measures
+  the CDN edge, not the server. Detect it (IP belongs to a known CDN range) and say so in the results.
+- **Other traffic during the test** — in global mode, the user's other apps also go through the server
+  under test, adding noise to the speeds. Options: warn in the report, or check `/connections` for
+  unrelated traffic during the transfer and flag noisy results. (Isolating the test from it was the
+  rejected "isolated core" / routing approach — don't reintroduce.)
+- **Ping timing** — pings run while the next server's download is going, which can add a little latency.
+  Could ping between transfers instead, at the cost of a slower run.
+
+## Small cleanups
+
+- Reject `--size` values of 0 or below.
+- Ctrl+C during the final ping phase can wait up to ~15 s before exiting; stop pending pings instead.
+- Process discovery and config files are read and parsed twice (`find_controller` and `config_hosts`);
+  cache them.
