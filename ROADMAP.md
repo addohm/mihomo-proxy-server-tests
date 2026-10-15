@@ -21,9 +21,6 @@ Planned work. Done items are removed (see git history).
 
 ## Ideas (not yet decided)
 
-- **Split engine from interface** — core module (controller discovery, state save/restore, per-server
-  tests, reports) that reports progress step by step; CLI and GUI become thin layers on top. Prerequisite
-  for the GUI.
 - **mihomo's own failure reason** — read mihomo's log through the API during each test to show the exact
   error (dial timeout, connection refused, auth failure).
 - **Direct TCP connect check** — plain TCP connect to `server:port` outside mihomo: a timeout means the port

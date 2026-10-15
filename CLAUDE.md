@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-Single-file tool: `mihomo_speedtest.py` tests every server in a **running** mihomo, exactly as
-mihomo uses it, and writes a Markdown + CSV report. `context.md` is the original handoff (2026-10-09), kept
+`mihomo_speedtest.py` tests every server in a **running** mihomo, exactly as mihomo uses it, and writes a
+Markdown + CSV report. The launcher only starts `mihomotest/cli.py`; the code lives in the `mihomotest/` package. `context.md` is the original handoff (2026-10-09), kept
 as a frozen snapshot for background; this file is the living summary. Keep this file, README and the
-script's docstring in sync when behaviour or options change.
+CLI docstring (`mihomotest/cli.py`, also the `--help` text) in sync when behaviour or options change.
 
 ## Hard rules
 
@@ -12,7 +12,8 @@ script's docstring in sync when behaviour or options change.
   exact command; the user runs it and reports back.
 - When the user does ask for a test, run it **only on the remote test server over SSH** — never locally.
   See "Remote test server" below.
-- Static checks are fine: `python3 -m py_compile mihomo_speedtest.py`.
+- Static checks are fine: `python3 -m py_compile mihomo_speedtest.py mihomotest/*.py`, and importing the
+  package (it has no side effects on import).
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
 - **Public tool.** Stay universal: Linux, Windows, macOS and **any mihomo-based client** (Clash Verge Rev,
   Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo) and any configuration (TCP/Unix/pipe controller,
@@ -42,9 +43,25 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
 `--out DIR` (default: next to the script).
 
-## How it works (map of the script)
+## Layout
 
-1. `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional (Windows process
+```
+mihomo_speedtest.py   launcher: checks Python 3.8+, calls mihomotest.cli.main()
+mihomotest/
+  system.py   OS flags, run() (commands without a shell), prereqs() list
+  mihomo.py   Controller (API), find_controller, MihomoState (test mode + restore), servers, DNS, connections
+  tests.py    curl, ping, test_server, run_tests (the run loop) + estimate/counts
+  report.py   cells/notes formatting, save_reports (Markdown + CSV)
+  cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
+```
+
+The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it raises `MihomoError` /
+`SecretNeeded` and reports progress through `run_tests(..., on_event)` events (`start`, `server`, `pinging`,
+`stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
+
+## How it works
+
+1. `prereqs` / `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional (Windows process
    discovery only). External commands run directly via `run` (argv list, no shell).
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
    `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
@@ -81,7 +98,7 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
   host key pinned). Fedora 44, x86_64, ~450 MB RAM. Keep the IP out of the repo.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
-- To test: copy the current `mihomo_speedtest.py` over with `scp` and run it there, as root.
+- To test: copy `mihomo_speedtest.py` and `mihomotest/` over with `scp -r` and run it there, as root.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
