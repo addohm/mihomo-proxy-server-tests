@@ -71,8 +71,12 @@ Planned work. Done items are removed (see git history).
   timings: bytes ÷ (total − time until data starts)), since connection time gets its own column.
   - Decided: the transfer-only speed **replaces** the current figure (one speed column + "Conn ms"). Reports
     must state the method, so "compare runs" doesn't mix old and new speeds.
-- **Label CDN-fronted servers** — for servers behind a CDN (e.g. ws+tls via Cloudflare) the ping measures
-  the CDN edge, not the server. Detect it (IP belongs to a known CDN range) and say so in the results.
+- **Label CDN-fronted servers** — for servers reached through a CDN (ws/grpc via Cloudflare etc.) the direct
+  ping measures the nearest CDN edge, not the server. Note: "via Cloudflare CDN: ping shows the CDN edge,
+  not the server" (and point to "Conn ms" as the honest latency).
+  - Decided: Cloudflare's published ranges built in (~22 prefixes, no network calls, works everywhere).
+    Other CDNs (Fastly, Akamai, CloudFront…) recognised by network owner only when `--trace` already does
+    owner lookups — no extra third-party lookups otherwise.
 - **Other traffic during the test** — in global mode, the user's other proxied apps also go through the
   server under test, lowering its measured speed. The script already polls `/connections` during each
   download; use its per-connection byte counts to measure traffic that isn't the test's own.
