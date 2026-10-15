@@ -67,17 +67,20 @@ Planned work. Done items are removed (see git history).
   response after N s", or "slow start: no response in the first 10 s" when the warm-up got nothing but the
   transfers worked. Threshold for "slow" to settle when implementing (proposal: 3 s). Pairs with
   "connection time through the server".
-- **Speed excluding connection setup** — curl's average speed includes connecting and the TLS handshake,
-  so far-away servers look slower on a 10 MB test. Could compute speed from the transfer phase only
-  (curl's `time_starttransfer`), or just document it.
+- **Speed excluding connection setup** — compute download/upload speed from the transfer phase only (curl's
+  timings: bytes ÷ (total − time until data starts)), since connection time gets its own column.
+  - Decided: the transfer-only speed **replaces** the current figure (one speed column + "Conn ms"). Reports
+    must state the method, so "compare runs" doesn't mix old and new speeds.
 - **Label CDN-fronted servers** — for servers behind a CDN (e.g. ws+tls via Cloudflare) the ping measures
   the CDN edge, not the server. Detect it (IP belongs to a known CDN range) and say so in the results.
 - **Other traffic during the test** — in global mode, the user's other apps also go through the server
   under test, adding noise to the speeds. Options: warn in the report, or check `/connections` for
   unrelated traffic during the transfer and flag noisy results. (Isolating the test from it was the
   rejected "isolated core" / routing approach — don't reintroduce.)
-- **Ping timing** — pings run while the next server's download is going, which can add a little latency.
-  Could ping between transfers instead, at the cost of a slower run.
+- **Ping timing** — pings currently run while the next server's download fills the connection, inflating
+  ping and (now) direct jitter, which would wrongly blame the user's own network.
+  - Decided: ping **all servers together at the end**, after every transfer has finished (addresses still
+    collected during the run). ~15–20 s once per run; raise the ping pool size accordingly.
 
 - **Config variations on the test server** — `testserver/setup.sh` options to switch the core between
   the setups the script must handle (TCP / Unix-socket controller, with and without secret, mixed / socks /
