@@ -13,7 +13,7 @@ What it does
   4. Restores TUN, mode and your selection (also on Ctrl+C), prints the results and saves
      a Markdown and a CSV report.
 
-Works on Linux, macOS and Windows. Uses curl and ping through bash or PowerShell.
+Works on Linux, macOS and Windows. Uses the system's curl and ping.
 While the test runs, traffic that goes through mihomo uses the server under test.
 
 Optional arguments
@@ -34,7 +34,6 @@ import ipaddress
 import json
 import os
 import re
-import shlex
 import shutil
 import signal
 import socket
@@ -42,6 +41,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unicodedata
 import urllib.parse
@@ -54,9 +54,14 @@ UP_URL = "https://speed.cloudflare.com/__up"
 GROUP_TYPES = {"selector", "urltest", "fallback", "loadbalance", "relay", "direct", "reject",
                "rejectdrop", "pass", "passrule", "compatible", "dns", "smart"}
 
-UNREACHABLE_NOTE = ("Note: 'unreachable' does NOT mean the server is down. The server is online (it answers "
-                    "ping), but mihomo could not connect to its proxy port from this network - usually the port "
-                    "or protocol is blocked on your connection, so the server cannot be used directly from here.")
+STOP_SIGNALS = ("SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK")
+
+UNREACHABLE_NOTE = ("Note: 'unreachable' does NOT mean the server is down. It answers ping, but mihomo could "
+                    "not get a working proxy connection through it from this network. Common causes: the port or "
+                    "protocol is blocked on your connection, or the server refused the connection (expired "
+                    "subscription, wrong password, changed server settings).")
+FAILED_NOTE = ("Note: 'failed' servers did not answer ping either (or their address could not be found). "
+               "They may be down, or they may simply block ping.")
 
 # ----------------------------------------------------------------- terminal ui
 if IS_WIN:
@@ -117,15 +122,11 @@ def ps_exe():
     return shutil.which("pwsh") or shutil.which("powershell")
 
 
-def run_shell(args, timeout=60):
-    """Run an argv list through bash (Linux/macOS) or PowerShell (Windows)."""
-    if IS_WIN:
-        q = lambda a: "'" + str(a).replace("'", "''") + "'"
-        cmd = [ps_exe(), "-NoProfile", "-NonInteractive", "-Command", "& " + " ".join(q(a) for a in args)]
-    else:
-        cmd = [shutil.which("bash") or "bash", "-c", " ".join(shlex.quote(str(a)) for a in args)]
+def run(args, timeout=60):
+    """Run a command directly (no shell). Returns (exit_code, stdout, stderr)."""
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, errors="replace")
+        p = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=timeout,
+                           errors="replace")
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout"
@@ -138,7 +139,7 @@ def curl(proxy, url, extra=(), max_time=20):
     args = ["curl.exe" if IS_WIN else "curl", "-sS", "-o", NULL_DEV, "-x", proxy,
             "--connect-timeout", "10", "-m", str(max_time),
             "-w", "%{http_code} %{speed_download} %{speed_upload}", *extra, url]
-    rc, out, _ = run_shell(args, timeout=max_time + 15)
+    rc, out, _ = run(args, timeout=max_time + 15)
     p = out.split()
     try:
         return rc, int(p[0]), float(p[1]), float(p[2])
@@ -149,10 +150,15 @@ def curl(proxy, url, extra=(), max_time=20):
 def ping(ip, count=4):
     """ICMP ping. Returns (avg_ms | None, loss_pct | None)."""
     args = ["ping", "-n", str(count), "-w", "2000", ip] if IS_WIN else ["ping", "-c", str(count), "-W", "2", ip]
-    _, out, _ = run_shell(args, timeout=count * 3 + 5)
-    times = [float(x) for x in re.findall(r"time[=<]\s*([\d.]+)\s*ms", out, re.I)]
-    if not times and IS_WIN:  # localised Windows output
-        times = [float(x) for x in re.findall(r"[=<]\s*(\d+)\s*ms", out)][:count]
+    _, out, _ = run(args, timeout=count * 3 + 5)
+    # A reply line has exactly one "=12.3 ms" / "<1ms" value in any language; the Windows summary line
+    # ("Minimum = 12ms, Maximum = ..., Average = ...") has three, and the Linux/macOS one uses "a/b/c ms".
+    times = []
+    for line in out.splitlines():
+        found = re.findall(r"[=<]\s*([\d.]+)\s*ms", line)
+        if len(found) == 1:
+            times.append(float(found[0]))
+    times = times[:count]
     if not times:
         return None, 100.0
     return statistics.mean(times), round(100 * (1 - len(times) / count))
@@ -162,13 +168,12 @@ def ping(ip, count=4):
 def check_prereqs():
     rows = [("Python 3.8+", sys.version_info >= (3, 8), sys.version.split()[0], "Install Python 3.8 or newer")]
     if IS_WIN:
-        rows += [("PowerShell", bool(ps_exe()), ps_exe() or "not found", "Included with Windows"),
-                 ("curl.exe", bool(shutil.which("curl.exe")), shutil.which("curl.exe") or "not found",
-                  "Included in Windows 10+; or: winget install cURL.cURL")]
+        rows += [("curl.exe", bool(shutil.which("curl.exe")), shutil.which("curl.exe") or "not found",
+                  "Included in Windows 10+; or: winget install cURL.cURL"),
+                 ("PowerShell", True if ps_exe() else None,
+                  ps_exe() or "not found (optional: helps find the running mihomo)", "")]
     else:
-        rows += [("bash", bool(shutil.which("bash")), shutil.which("bash") or "not found",
-                  "Install bash with your package manager"),
-                 ("curl", bool(shutil.which("curl")), shutil.which("curl") or "not found",
+        rows += [("curl", bool(shutil.which("curl")), shutil.which("curl") or "not found",
                   "sudo apt install curl | sudo dnf install curl | brew install curl")]
     rows.append(("ping", bool(shutil.which("ping")), shutil.which("ping") or "not found",
                  "sudo apt install iputils-ping | sudo dnf install iputils"))
@@ -199,20 +204,38 @@ class Controller:
     def __str__(self):
         return {"tcp": f"http://{self.addr}", "unix": f"unix:{self.addr}", "pipe": self.addr}[self.kind]
 
+    def _pipe_exchange(self, raw):
+        with open(self.addr, "r+b", buffering=0) as f:
+            f.write(raw)
+            chunks = []
+            while True:
+                try:
+                    b = f.read(65536)
+                except OSError:
+                    break
+                if not b:
+                    break
+                chunks.append(b)
+            return b"".join(chunks)
+
     def _exchange(self, raw, timeout):
         if self.kind == "pipe":
-            with open(self.addr, "r+b", buffering=0) as f:
-                f.write(raw)
-                chunks = []
-                while True:
-                    try:
-                        b = f.read(65536)
-                    except OSError:
-                        break
-                    if not b:
-                        break
-                    chunks.append(b)
-                return b"".join(chunks)
+            # pipe reads can't time out by themselves: run in a daemon thread and give up after `timeout`
+            box = {}
+
+            def work():
+                try:
+                    box["data"] = self._pipe_exchange(raw)
+                except OSError as e:
+                    box["err"] = e
+            t = threading.Thread(target=work, daemon=True)
+            t.start()
+            t.join(timeout)
+            if t.is_alive():
+                raise OSError(f"no answer from {self.addr} within {timeout} s")
+            if "err" in box:
+                raise box["err"]
+            return box["data"]
         if self.kind == "unix":
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(timeout)
@@ -258,12 +281,9 @@ def running_cores():
                "Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'mihomo|clash' } | "
                "ForEach-Object { $_.CommandLine }"]
     else:
-        cmd = ["bash", "-c", "ps -eo args | grep -iE 'mihomo|clash' | grep -v grep"]
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=15, errors="replace").stdout
-    except (OSError, subprocess.TimeoutExpired):
-        return []
-    return [l.strip() for l in out.splitlines() if l.strip()]
+        cmd = ["ps", "-eo", "args"]
+    _, out, _ = run(cmd, timeout=15)
+    return [l.strip() for l in out.splitlines() if re.search(r"mihomo|clash", l, re.I)]
 
 
 def arg_value(cmdline, flag):
@@ -433,13 +453,23 @@ class MihomoState:
         if not self.applied:
             return
         self.applied = False
-        if self.global_now:
-            self.ctl.call("PUT", "/proxies/GLOBAL", {"name": self.global_now})
-        self.ctl.call("PATCH", "/configs", {"mode": self.mode})
-        if self.opened_port:
-            self.ctl.call("PATCH", "/configs", {"mixed-port": 0})
-        if self.tun:
-            self.ctl.call("PATCH", "/configs", {"tun": {"enable": True}})
+        held = {}  # a second Ctrl+C (or SIGTERM/HUP) must not cut the restore short
+        for sig in STOP_SIGNALS:
+            try:
+                held[sig] = signal.signal(getattr(signal, sig), signal.SIG_IGN)
+            except (AttributeError, OSError, ValueError):
+                pass
+        try:
+            if self.global_now:
+                self.ctl.call("PUT", "/proxies/GLOBAL", {"name": self.global_now})
+            self.ctl.call("PATCH", "/configs", {"mode": self.mode})
+            if self.opened_port:
+                self.ctl.call("PATCH", "/configs", {"mixed-port": 0})
+            if self.tun:
+                self.ctl.call("PATCH", "/configs", {"tun": {"enable": True}})
+        finally:
+            for sig, handler in held.items():
+                signal.signal(getattr(signal, sig), handler)
 
     def describe(self):
         return (f"mode '{self.mode}', TUN {'on' if self.tun else 'off'}"
@@ -587,6 +617,8 @@ def save_reports(results, meta, out_dir):
         lines.append("| " + " | ".join(v.replace("|", "\\|") for v in cells(i, r) + [r["note"]]) + " |")
     if meta["unreachable"]:
         lines += ["", f"> {UNREACHABLE_NOTE}"]
+    if meta["failed"]:
+        lines += ["", f"> {FAILED_NOTE}"]
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel opens UTF-8 names
@@ -632,7 +664,7 @@ def main():
 
     def stop(*_):
         raise KeyboardInterrupt
-    for sig in ("SIGTERM", "SIGHUP", "SIGBREAK"):
+    for sig in STOP_SIGNALS[1:]:  # SIGINT already raises KeyboardInterrupt
         if hasattr(signal, sig):
             try:
                 signal.signal(getattr(signal, sig), stop)
@@ -669,7 +701,7 @@ def main():
                 r["ping"], r["loss"] = pings[r["name"]].result()
                 if r["result"] == "failed" and r["ping"] is not None:
                     r["result"] = "unreachable"
-                    r["note"] = "server online (answers ping), but its proxy port can't be reached from this network"
+                    r["note"] = "answers ping, but no working proxy connection from this network"
         clear_status()
     except KeyboardInterrupt:
         clear_status()
@@ -690,6 +722,8 @@ def main():
           f"servers in {runtime}")
     if n["unreachable"]:
         print(warn("\n" + UNREACHABLE_NOTE))
+    if n["failed"]:
+        print(warn("\n" + FAILED_NOTE))
     fast = [r for r in results if r["down"]]
     if fast:
         b = max(fast, key=lambda r: r["down"])

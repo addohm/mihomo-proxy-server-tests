@@ -13,7 +13,6 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 (also on Ctrl+C). Results are printed and saved next to the script as
 `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
 
-Requirements: Python 3.8+, `curl`, `ping`, and bash (Linux/macOS) or PowerShell (Windows).
-PyYAML is optional. Run with `--help` for all options.
+Requirements: Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all options.
 
 Status: in use on Linux. Windows and macOS support is written but not yet tested.

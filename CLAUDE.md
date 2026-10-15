@@ -1,9 +1,9 @@
 # CLAUDE.md
 
 Single-file tool: `mihomo_speedtest.py` tests every server in the user's **running** mihomo, exactly as
-mihomo uses it, and writes a Markdown + CSV report. `context.md` is the original handoff (2026-10-09) with
-more background; this file is the living summary. Keep both, README and the script's docstring in sync
-when behaviour or options change.
+mihomo uses it, and writes a Markdown + CSV report. `context.md` is the original handoff (2026-10-09), kept
+as a frozen snapshot for background; this file is the living summary. Keep this file, README and the
+script's docstring in sync when behaviour or options change.
 
 ## Hard rules
 
@@ -42,14 +42,14 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
 
 ## How it works (map of the script)
 
-1. `check_prereqs`: Python 3.8+, curl, ping, and bash (Linux/macOS) or PowerShell + `curl.exe` (Windows).
-   External commands go through `run_shell` (bash or PowerShell, argv quoted).
+1. `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional (Windows process
+   discovery only). External commands run directly via `run` (argv list, no shell).
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
    `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
-   HTTP/1.0 over TCP, Unix socket or Windows named pipe.
+   HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time out).
 3. `MihomoState`: records mode, TUN, `GLOBAL` selection; turns TUN off, sets mode `global`; opens a temporary
    `mixed-port` only if there's no local proxy port. `restore()` runs in `finally` (also Ctrl+C,
-   SIGTERM/HUP/BREAK).
+   SIGTERM/HUP/BREAK); those signals are ignored while it runs so a second Ctrl+C can't cut it short.
 4. `list_servers`: `/proxies` entries that aren't groups (`GROUP_TYPES`), in `GLOBAL` order.
 5. `test_server`, one server at a time: `PUT /proxies/GLOBAL` → warm-up probes (≤10 s; first connections are
    slow) → download via curl through mihomo → upload (one retry if warm-up worked). Timed-out transfers
@@ -58,7 +58,8 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
    during the download). Servers that never connect fall back to the config's `server` host resolved through
    mihomo's DNS (`config_hosts` + `mihomo_resolve` via `/dns/query`). Pings run in a thread pool.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
-   When any are unreachable, `UNREACHABLE_NOTE` is shown (terminal + Markdown).
+   `UNREACHABLE_NOTE` / `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean
+   the server refused the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
 8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). Falls back
    to cwd, then the temp dir, if `--out` isn't writable. Reports are git-ignored.
 
@@ -80,7 +81,7 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.
 
 ## Open items
 
-- First real run on **Windows** (PowerShell quoting, `curl.exe`, named-pipe API, `ping` parsing,
+- First real run on **Windows** (`curl.exe`, named-pipe API, localised `ping` parsing,
   `Get-CimInstance` discovery) and **macOS** — those paths are written but have never run.
 - A full 44-server Linux run with the latest changes (unreachable label, slow-upload handling,
   progress-line trimming) hasn't been done; a 3-server run confirmed the labels and note.
