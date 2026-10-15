@@ -1,1 +1,19 @@
 # mihomo-proxy-server-tests
+
+`mihomo_speedtest.py` tests every server in your **running** mihomo, exactly as mihomo uses it:
+download/upload speed through mihomo and ping to the address it actually dialed. Works with any
+mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo).
+
+```bash
+python3 mihomo_speedtest.py                      # test everything
+python3 mihomo_speedtest.py --filter "^Japan$"   # only matching servers
+```
+
+While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
+(also on Ctrl+C). Results are printed and saved next to the script as
+`mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
+
+Requirements: Python 3.8+, `curl`, `ping`, and bash (Linux/macOS) or PowerShell (Windows).
+PyYAML is optional. Run with `--help` for all options.
+
+Status: in use on Linux. Windows and macOS support is written but not yet tested.
