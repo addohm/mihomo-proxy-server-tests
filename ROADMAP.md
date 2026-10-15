@@ -13,6 +13,11 @@ Planned work, not started. Nothing here is being executed yet.
   - Rejected: Tkinter (dated, weak live tables/charts), Qt/PySide6 (~200 MB dependency), Tauri/Electron
     (second language and build toolchain).
   - Later, optionally: a single-file PyInstaller bundle per OS that opens the page, so users don't need Python.
+  - **Terminal mode stays** for machines without a desktop (servers, SSH sessions). Proposed: detect it
+    automatically (Linux with no `DISPLAY`/`WAYLAND_DISPLAY`, or an SSH session → terminal mode; Windows and
+    macOS → GUI), with `--cli` / `--gui` to override (e.g. `--cli` for scripts and cron). The web server
+    listens on localhost only, so `--gui` on a headless machine still works through an SSH tunnel
+    (`ssh -L PORT:localhost:PORT host`). Default behaviour to be confirmed with the user.
 
 ## Ideas (not yet decided)
 
