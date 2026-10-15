@@ -23,6 +23,11 @@ Planned work. Done items are removed (see git history).
 
 - **mihomo's own failure reason** — read mihomo's log through the API during each test to show the exact
   error (dial timeout, connection refused, auth failure).
+  - Decided: plain-language cause in the table; mihomo's raw message in the Markdown/CSV reports.
+  - Decided for now: keep the four result labels, cause goes in the Note column. The user wants clearer
+    labels eventually — revisit after the TCP connect check, when the classification is reliable.
+  - Check first on the test server: does mihomo send warnings to API log subscribers when the client's
+    log level is `error` / `silent`?
 - **Direct TCP connect check** — plain TCP connect to `server:port` outside mihomo: a timeout means the port
   is blocked; it opens but mihomo fails means the server refuses (credentials/settings). TCP only, not
   hy2/tuic (UDP).
