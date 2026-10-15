@@ -254,6 +254,7 @@ class MihomoState:
         self.tun = bool((conf.get("tun") or {}).get("enable"))
         st, g = ctl.call("GET", "/proxies/GLOBAL")
         self.global_now = (g or {}).get("now") if st == 200 else None
+        self.saved = {}  # selector group -> its selection before the test (filled as groups are touched)
         self.opened_port = None
         self.applied = False
 
@@ -277,9 +278,17 @@ class MihomoState:
         self.ctl.call("PATCH", "/configs", {"mode": "global"})
         time.sleep(2)  # let routes settle after TUN goes down
 
-    def select(self, name):
-        st, _ = self.ctl.call("PUT", "/proxies/GLOBAL", {"name": name})
-        return st in (200, 204)
+    def select(self, srv):
+        """Select a server by walking its path of selector groups (GLOBAL -> ... -> server)."""
+        for group, choice in srv.get("path") or []:
+            path = "/proxies/" + urllib.parse.quote(group, safe="")
+            if group not in self.saved:
+                st, g = self.ctl.call("GET", path)
+                self.saved[group] = (g or {}).get("now") if st == 200 else None
+            st, _ = self.ctl.call("PUT", path, {"name": choice})
+            if st not in (200, 204):
+                return False
+        return bool(srv.get("path"))
 
     def restore(self):
         if not self.applied:
@@ -292,8 +301,10 @@ class MihomoState:
             except (AttributeError, OSError, ValueError):  # ValueError: not the main thread
                 pass
         try:
-            if self.global_now:
-                self.ctl.call("PUT", "/proxies/GLOBAL", {"name": self.global_now})
+            saved = dict(self.saved, GLOBAL=self.global_now)  # inner groups first, GLOBAL last
+            for group in sorted(saved, key=lambda g: g == "GLOBAL"):
+                if saved[group]:
+                    self.ctl.call("PUT", "/proxies/" + urllib.parse.quote(group, safe=""), {"name": saved[group]})
             self.ctl.call("PATCH", "/configs", {"mode": self.mode})
             if self.opened_port:
                 self.ctl.call("PATCH", "/configs", {"mixed-port": 0})
@@ -309,15 +320,34 @@ class MihomoState:
 
 
 def list_servers(ctl):
-    """[{name, type}] of every server (not group), in GLOBAL order."""
+    """[{name, type, path}] of every server (not group). Servers loaded from proxy providers aren't in
+    GLOBAL's list, so each server gets the chain of selector groups that reaches it from GLOBAL:
+    path = [("GLOBAL", "PROXY"), ("PROXY", server)]; None if no selector reaches it (it can't be selected).
+    Order: as found walking from GLOBAL (so GLOBAL's own order first), then unreachable ones."""
     st, body = ctl.call("GET", "/proxies", timeout=20)
     if st != 200 or not body:
         raise MihomoError(f"mihomo API error reading /proxies (HTTP {st}).")
     allp = body.get("proxies", {})
-    is_server = lambda n: n in allp and str(allp[n].get("type", "")).lower() not in GROUP_TYPES
-    order = [n for n in (allp.get("GLOBAL") or {}).get("all", []) if is_server(n)]
-    order += [n for n in allp if is_server(n) and n not in order]
-    return [{"name": n, "type": str(allp[n].get("type", "?")).lower()} for n in order]
+    types = {n: str(v.get("type", "?")).lower() for n, v in allp.items()}
+    st, body = ctl.call("GET", "/providers/proxies", timeout=20)
+    for prov in ((body or {}).get("providers") or {}).values() if st == 200 else []:
+        if str(prov.get("vehicleType", "")).lower() == "compatible":  # mihomo's own, mirrors /proxies
+            continue
+        for p in prov.get("proxies") or []:
+            types.setdefault(p.get("name"), str(p.get("type", "?")).lower())
+    is_server = lambda n: n in types and types[n] not in GROUP_TYPES
+    paths, queue, seen = {}, [("GLOBAL", [])], {"GLOBAL"}
+    while queue:
+        group, path = queue.pop(0)
+        for member in (allp.get(group) or {}).get("all", []):
+            step = path + [(group, member)]
+            if is_server(member):
+                paths.setdefault(member, step)
+            elif types.get(member) == "selector" and member not in seen:
+                seen.add(member)
+                queue.append((member, step))
+    order = list(paths) + [n for n in types if is_server(n) and n not in paths]
+    return [{"name": n, "type": types[n], "path": paths.get(n)} for n in order]
 
 
 def config_hosts(names):

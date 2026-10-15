@@ -66,11 +66,14 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
    `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
    HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time out).
-3. `MihomoState`: records mode, TUN, `GLOBAL` selection; turns TUN off, sets mode `global`; opens a temporary
+3. `MihomoState`: records mode, TUN, `GLOBAL` selection (and, as they're touched, every other selector
+   group's selection); turns TUN off, sets mode `global`; opens a temporary
    `mixed-port` only if there's no local proxy port. `restore()` runs in `finally` (also Ctrl+C,
    SIGTERM/HUP/BREAK); those signals are ignored while it runs so a second Ctrl+C can't cut it short.
-4. `list_servers`: `/proxies` entries that aren't groups (`GROUP_TYPES`), in `GLOBAL` order.
-5. `test_server`, one server at a time: `PUT /proxies/GLOBAL` → warm-up probes (≤10 s; first connections are
+4. `list_servers`: servers from `/proxies` plus `/providers/proxies` (provider servers are **not** in
+   `GLOBAL`'s list). Each gets a `path` of selector groups from `GLOBAL` (e.g. GLOBAL → PROXY → server),
+   found by walking selectors from `GLOBAL`; `None` if no selector reaches it (reported as not selectable).
+5. `test_server`, one server at a time: `state.select` walks the server's path (`PUT /proxies/<group>`) → warm-up probes (≤10 s; first connections are
    slow) → download via curl through mihomo → upload (one retry if warm-up worked). Timed-out transfers
    (curl rc 28) keep their speed with a "slow: … hit the time limit" note.
 6. Ping the IP mihomo **actually dialed** (`remote_ip`: `/connections` → `metadata.remoteDestination`, polled

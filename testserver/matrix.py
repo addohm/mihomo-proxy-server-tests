@@ -7,7 +7,7 @@ For each variant (see variant.py): switch mihomo into it, put mihomo in a known 
 GLOBAL on a real server), test N servers (default 2: the first ones in GLOBAL order), then check:
     found     the script found and connected to mihomo on its own
     tested    it tested every chosen server and at least one was ok
-    restored  mode, TUN, GLOBAL selection and local proxy ports are exactly as before
+    restored  mode, TUN, every selector group's selection and local proxy ports are exactly as before
 Always switches back to the default setup at the end. Exit code 1 if any variant failed.
 
 It toggles TUN, so run it detached from the SSH session:
@@ -29,16 +29,23 @@ VARIANTS = [[], ["controller=unix"], ["secret=no"], ["port=socks"], ["port=http"
 
 def snapshot(info):
     c = api(info, "GET", "/configs") or {}
-    g = api(info, "GET", "/proxies/GLOBAL") or {}
+    p = (api(info, "GET", "/proxies", timeout=20) or {}).get("proxies", {})
     return {"mode": c.get("mode"), "tun": bool((c.get("tun") or {}).get("enable")),
             "mixed-port": c.get("mixed-port", 0), "socks-port": c.get("socks-port", 0),
-            "port": c.get("port", 0), "global": g.get("now")}
+            "port": c.get("port", 0),
+            "selections": {n: v.get("now") for n, v in p.items() if str(v.get("type", "")).lower() == "selector"}}
 
 
 def server_names(info):
+    """Servers in GLOBAL order, then servers that only exist in proxy providers."""
     p = (api(info, "GET", "/proxies", timeout=20) or {}).get("proxies", {})
-    return [n for n in (p.get("GLOBAL") or {}).get("all", [])
-            if str(p.get(n, {}).get("type", "")).lower() not in GROUP_TYPES]
+    names = [n for n in (p.get("GLOBAL") or {}).get("all", [])
+             if str(p.get(n, {}).get("type", "")).lower() not in GROUP_TYPES]
+    provs = (api(info, "GET", "/providers/proxies", timeout=20) or {}).get("providers", {})
+    for prov in provs.values():
+        if str(prov.get("vehicleType", "")).lower() != "compatible":
+            names += [x["name"] for x in prov.get("proxies") or [] if x.get("name") not in names]
+    return names
 
 
 def run_variant(changes, args, ssh_ip, out_dir):
@@ -48,7 +55,7 @@ def run_variant(changes, args, ssh_ip, out_dir):
     if not pick:
         return False, "no servers to test", ""
     api(info, "PATCH", "/configs", {"mode": "rule"})
-    api(info, "PUT", "/proxies/GLOBAL", {"name": pick[0]})
+    api(info, "PUT", "/proxies/GLOBAL", {"name": pick[0]})  # fails harmlessly for provider-only servers
     before = snapshot(info)
     rx = "|".join("^" + re.escape(n) + "$" for n in pick)
     p = subprocess.run([sys.executable, args.launcher, "--size", "2", "--out", out_dir, "--filter", rx],

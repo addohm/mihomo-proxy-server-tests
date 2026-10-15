@@ -54,8 +54,9 @@ def ping(ip, count=4):
 def test_server(ctl, state, proxy, srv, size, timeout, up_file):
     r = {"name": srv["name"], "type": srv["type"], "ip": None, "ping": None, "loss": None,
          "down": None, "up": None, "result": "", "note": ""}
-    if not state.select(srv["name"]):
-        r["result"], r["note"] = "failed", "mihomo would not select this server"
+    if not state.select(srv):
+        r["result"], r["note"] = "failed", ("mihomo would not select this server" if srv.get("path")
+                                            else "no selector group contains this server, so it can't be selected")
         return r
     # warm-up: the first connection through a newly selected server can take a few seconds
     deadline, rc = time.time() + 10, -1
