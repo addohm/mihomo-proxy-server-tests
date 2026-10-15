@@ -30,7 +30,11 @@ Planned work. Done items are removed (see git history).
     log level is `error` / `silent`?
 - **Direct TCP connect check** — plain TCP connect to `server:port` outside mihomo: a timeout means the port
   is blocked; it opens but mihomo fails means the server refuses (credentials/settings). TCP only, not
-  hy2/tuic (UDP).
+  hy2/tuic (UDP) — shown as "not checkable (UDP)". "Opens, then fails" can't tell a server rejecting from
+  a censor cutting the connection.
+  - Decided: only for failed servers (can change later).
+  - Decided: also read mihomo's provider cache files to find server:port for provider-based setups; the
+    same lookup improves the ping fallback.
 - **Traceroute on failure** — ICMP traceroute is useless for "unreachable" servers (ICMP already gets
   through); they need a TCP traceroute to the proxy port (Linux: `traceroute -T -p PORT` needs root, or
   `tcptraceroute`; Windows has nothing built in). ICMP traceroute is still useful for "failed" servers.
