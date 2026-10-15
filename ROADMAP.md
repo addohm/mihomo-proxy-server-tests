@@ -1,6 +1,19 @@
 # Roadmap
 
-Planned work. Done items are removed (see git history).
+Planned work. Done items are removed (see git history). Every item below has been discussed and its
+decisions recorded (2026-10-15).
+
+## Implementation order
+
+1. Config variations matrix (test tooling first, so every later change is checked)
+2. Diagnosis: mihomo's failure reason, direct TCP check (+ provider cache lookup), slow-start flag
+3. Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic flag,
+   CDN labels, table layout rework
+4. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
+5. Per-user reports folder + baseline / `--compare`
+6. Revisit clearer result labels (needs 2 and 3)
+7. GUI (local web page)
+8. Packaging + releases
 
 ## Decided
 
@@ -125,7 +138,11 @@ Planned work. Done items are removed (see git history).
   - Decided: ping **all servers together at the end**, after every transfer has finished (addresses still
     collected during the run). ~15–20 s once per run; raise the ping pool size accordingly.
 
-- **Config variations on the test server** — `testserver/setup.sh` options to switch the core between
-  the setups the script must handle (TCP / Unix-socket controller, with and without secret, mixed / socks /
-  http / no proxy port, TUN on / off, full profile vs provider-only), so each discovery and restore path
-  can be checked.
+- **Config variations on the test server** — check every discovery and restore path, not just the default
+  setup.
+  - Decided: `testserver/variant.sh` switches the test core into a variant (TCP / Unix-socket controller,
+    secret / none, mixed / socks / http / no port, TUN on / off, full profile / provider-only) and restarts
+    it; `testserver/matrix.sh` runs each variant **one change at a time** from the default (~8 short
+    2-server runs) and checks: mihomo found, servers tested, and mihomo's settings afterwards exactly as
+    before. Run before every release.
+  - Limit: Linux only; Windows/macOS paths stay untested (a Windows VM later if needed).
