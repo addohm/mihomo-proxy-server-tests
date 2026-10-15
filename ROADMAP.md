@@ -6,7 +6,7 @@ decisions recorded (2026-10-15).
 ## Implementation order
 
 1. ~~Config variations matrix~~ — done (`testserver/variant.py`, `matrix.py`)
-2. Diagnosis: mihomo's failure reason, direct TCP check (+ provider cache lookup), slow-start flag
+2. ~~Diagnosis: mihomo's failure reason, direct TCP check (+ provider cache lookup), slow-start flag~~ — done
 3. Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic flag,
    CDN labels, table layout rework
 4. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
@@ -55,20 +55,6 @@ decisions recorded (2026-10-15).
 
 ## Ideas (not yet decided)
 
-- **mihomo's own failure reason** — read mihomo's log through the API during each test to show the exact
-  error (dial timeout, connection refused, auth failure).
-  - Decided: plain-language cause in the table; mihomo's raw message in the Markdown/CSV reports.
-  - Decided for now: keep the four result labels, cause goes in the Note column. The user wants clearer
-    labels eventually — revisit after the TCP connect check, when the classification is reliable.
-  - Check first on the test server: does mihomo send warnings to API log subscribers when the client's
-    log level is `error` / `silent`?
-- **Direct TCP connect check** — plain TCP connect to `server:port` outside mihomo: a timeout means the port
-  is blocked; it opens but mihomo fails means the server refuses (credentials/settings). TCP only, not
-  hy2/tuic (UDP) — shown as "not checkable (UDP)". "Opens, then fails" can't tell a server rejecting from
-  a censor cutting the connection.
-  - Decided: only for failed servers (can change later).
-  - Decided: also read mihomo's provider cache files to find server:port for provider-based setups; the
-    same lookup improves the ping fallback.
 - **Traceroute on failure** — ICMP traceroute is useless for "unreachable" servers (ICMP already gets
   through); they need a TCP traceroute to the proxy port (Linux: `traceroute -T -p PORT` needs root, or
   `tcptraceroute`; Windows has nothing built in). ICMP traceroute is still useful for "failed" servers.
@@ -107,12 +93,8 @@ decisions recorded (2026-10-15).
   - Reports record their speed method; speed changes aren't compared across methods (with a note).
   - The comparison header shows both dates and warns that a baseline from another network or time of day
     isn't a fair comparison.
-- **Flag slow starters** (replaces "skip transfers for dead servers", rejected: never skip a server that
-  might start — "if it starts, it starts"). Always run the transfers as today, and record how long the
-  first response through a newly selected server took. Flag it in the Note column: "slow start: first
-  response after N s", or "slow start: no response in the first 10 s" when the warm-up got nothing but the
-  transfers worked. Threshold for "slow" to settle when implementing (proposal: 3 s). Pairs with
-  "connection time through the server".
+- **Clearer result labels** — the user wants clearer answers than ok / partial / unreachable / failed. Now that
+  every failure has a cause and a direct check, revisit (implementation order step 6).
 - **Speed excluding connection setup** — compute download/upload speed from the transfer phase only (curl's
   timings: bytes ÷ (total − time until data starts)), since connection time gets its own column.
   - Decided: the transfer-only speed **replaces** the current figure (one speed column + "Conn ms"). Reports

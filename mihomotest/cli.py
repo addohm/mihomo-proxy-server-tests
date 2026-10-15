@@ -8,7 +8,9 @@ What it does
      FlClash, ClashX Meta, plain mihomo...) through its external-controller API.
   2. Temporarily turns TUN off and switches mihomo to global mode.
   3. For each server: selects it, downloads and uploads through mihomo, and pings the
-     server address mihomo actually connected to.
+     server address mihomo actually connected to. For servers that don't work it shows
+     why (mihomo's own error, plus a direct check of the server's port) and flags slow
+     starters.
   4. Restores TUN, mode and your selection (also on Ctrl+C), prints the results and saves
      a Markdown and a CSV report.
 

@@ -75,17 +75,31 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    found by walking selectors from `GLOBAL`; `None` if no selector reaches it (reported as not selectable).
 5. `test_server`, one server at a time: `state.select` walks the server's path (`PUT /proxies/<group>`) → warm-up probes (≤10 s; first connections are
    slow) → download via curl through mihomo → upload (one retry if warm-up worked). Timed-out transfers
-   (curl rc 28) keep their speed with a "slow: … hit the time limit" note.
+   (curl rc 28) keep their speed with a "slow: … hit the time limit" note. Time to the first warm-up response
+   is recorded; over `SLOW_START` (3 s) → "slow start: first response after N s"; no warm-up response but the
+   transfers worked → "slow start: no response in the first 10 s". Servers are never skipped.
+   **Failure cause**: `LogWatcher` streams `/logs?level=warning` in the background for the whole run (mihomo
+   streams warnings even at client log level `silent`); a server that isn't ok gets the most common
+   `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in `r["error"]`
+   (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note.
 6. Ping the IP mihomo **actually dialed** (`remote_ip`: `/connections` → `metadata.remoteDestination`, polled
    during the download). Servers that never connect fall back to the config's `server` host resolved through
    mihomo's DNS (`config_hosts` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6 literals is
-   stripped). Pings run in a thread pool; queued pings are cancelled on Ctrl+C. macOS: `ping -W` is in ms,
+   stripped).
+   **Direct TCP check** (failed servers only): plain TCP connect to the dialed/resolved IP and the config's
+   port, outside mihomo (TUN is off) → `open` / `refused` / `no answer` / `no route`; UDP protocols
+   (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the config's `proxies`
+   plus its proxy-provider files (`path`, relative to the config's directory).
+   Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C. macOS: `ping -W` is in ms,
    IPv6 uses `ping6`.
    Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
-   `UNREACHABLE_NOTE` / `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean
+   Labels stay these four; the cause and the direct check go in the Note (e.g. "connection timed out;
+   direct check: port 43000 no answer"). `UNREACHABLE_NOTE` / `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean
    the server refused the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
-8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). Falls back
+8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). The Markdown
+   adds a "Failure details" section with mihomo's raw errors; the CSV adds `first_response_s`, `direct_check`
+   and `mihomo_error` columns. Falls back
    to cwd, then the temp dir, if `--out` isn't writable. Reports are git-ignored.
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
@@ -110,6 +124,10 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
   restore.** It toggles TUN, so start it detached and poll the log:
   `ssh mihomo-testserver 'SSH_IP=${SSH_CLIENT%% *} setsid nohup python3 /root/testserver/matrix.py
   /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'`
+- Simulating failures (used for the diagnosis work): a temporary nftables table on the output hook
+  (`drop` = blocked port, `reject with tcp reset` = refused; UDP drop gives "operation not permitted" locally),
+  and `tc … netem delay` on a `prio` band filtered by destination IP for slow starters. Always delete them
+  afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 

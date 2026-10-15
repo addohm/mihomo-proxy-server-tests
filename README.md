@@ -1,7 +1,10 @@
 # mihomo-proxy-server-tests
 
 `mihomo_speedtest.py` tests every server in your **running** mihomo, exactly as mihomo uses it:
-download/upload speed through mihomo and ping to the address it actually dialed. Works with any
+download/upload speed through mihomo and ping to the address it actually dialed. For servers that
+don't work it shows why: mihomo's own error (e.g. "connection timed out", "config error") plus a direct
+check of the server's port (blocked, refused, or reachable). It also flags servers that are slow to start.
+Works with any
 mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo).
 
 ```bash
