@@ -46,8 +46,12 @@ Planned work. Done items are removed (see git history).
   consecutive replies), as a column next to ping and loss. About 2 lines; consider a few more pings per
   server so the number means something.
 - **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
-- **Skip transfers for dead servers** — if the warm-up never got a response, skip download/upload (saves
-  ~20 s per dead server; trade-off against the "first connection is slow" problem the warm-up handles).
+- **Flag slow starters** (replaces "skip transfers for dead servers", rejected: never skip a server that
+  might start — "if it starts, it starts"). Always run the transfers as today, and record how long the
+  first response through a newly selected server took. Flag it in the Note column: "slow start: first
+  response after N s", or "slow start: no response in the first 10 s" when the warm-up got nothing but the
+  transfers worked. Threshold for "slow" to settle when implementing (proposal: 3 s). Pairs with
+  "connection time through the server".
 - **Speed excluding connection setup** — curl's average speed includes connecting and the TLS handshake,
   so far-away servers look slower on a 10 MB test. Could compute speed from the transfer phase only
   (curl's `time_starttransfer`), or just document it.
