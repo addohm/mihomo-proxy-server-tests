@@ -54,14 +54,19 @@ def save_reports(results, meta, out_dir):
         lines.append("| " + " | ".join(v.replace("|", "\\|") for v in cells(i, r) + [r["note"]]) + " |")
     for note in notes(meta):
         lines += ["", f"> {note}"]
+    errors = [r for r in results if r.get("error")]
+    if errors:
+        lines += ["", "## Failure details", "", "mihomo's own error message for each server that didn't work:", ""]
+        lines += [f"- **{r['name']}**: `{r['error'][:300]}`" for r in errors]
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel opens UTF-8 names
         w = csv.writer(f)
-        w.writerow(["server", "type", "ping_ms", "loss_pct", "download_mbps", "upload_mbps", "result", "note"])
+        w.writerow(["server", "type", "ping_ms", "loss_pct", "download_mbps", "upload_mbps", "result", "note",
+                    "first_response_s", "direct_check", "mihomo_error"])
+        num = lambda v, nd: "" if v is None else round(v, nd)
         for r in results:
-            w.writerow([r["name"], r["type"], "" if r["ping"] is None else round(r["ping"], 1),
-                        "" if r["loss"] is None else r["loss"],
-                        "" if r["down"] is None else round(r["down"], 2),
-                        "" if r["up"] is None else round(r["up"], 2), r["result"], r["note"]])
+            w.writerow([r["name"], r["type"], num(r["ping"], 1), "" if r["loss"] is None else r["loss"],
+                        num(r["down"], 2), num(r["up"], 2), r["result"], r["note"],
+                        num(r.get("first"), 1), r.get("check", ""), r.get("error", "")])
     return md_path, csv_path

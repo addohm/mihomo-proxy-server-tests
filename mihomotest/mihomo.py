@@ -53,6 +53,23 @@ class Controller:
                 chunks.append(b)
             return b"".join(chunks)
 
+    def _connect(self, timeout):
+        if self.kind == "unix":
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect(self.addr)
+            return sock
+        host, port = self.addr.rsplit(":", 1)
+        return socket.create_connection((host.strip("[]"), int(port)), timeout=timeout)
+
+    def _request(self, method, path, body=None):
+        data = json.dumps(body).encode() if body is not None else b""
+        head = (f"{method} {path} HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
+                f"Content-Length: {len(data)}\r\n")
+        if self.secret:
+            head += f"Authorization: Bearer {self.secret}\r\n"
+        return head.encode() + b"\r\n" + data
+
     def _exchange(self, raw, timeout):
         if self.kind == "pipe":
             # pipe reads can't time out by themselves: run in a daemon thread and give up after `timeout`
@@ -71,14 +88,7 @@ class Controller:
             if "err" in box:
                 raise box["err"]
             return box["data"]
-        if self.kind == "unix":
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
-            sock.connect(self.addr)
-        else:
-            host, port = self.addr.rsplit(":", 1)
-            sock = socket.create_connection((host.strip("[]"), int(port)), timeout=timeout)
-        with sock:
+        with self._connect(timeout) as sock:
             sock.sendall(raw)
             chunks = []
             while True:
@@ -90,13 +100,8 @@ class Controller:
 
     def call(self, method, path, body=None, timeout=10):
         """Returns (http_status, json_or_None); status 0 = no connection."""
-        data = json.dumps(body).encode() if body is not None else b""
-        head = (f"{method} {path} HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
-                f"Content-Length: {len(data)}\r\n")
-        if self.secret:
-            head += f"Authorization: Bearer {self.secret}\r\n"
         try:
-            resp = self._exchange(head.encode() + b"\r\n" + data, timeout)
+            resp = self._exchange(self._request(method, path, body), timeout)
             hdr, _, payload = resp.partition(b"\r\n\r\n")
             status = int(hdr.split(b" ", 2)[1])
         except (OSError, ValueError, IndexError):
@@ -106,11 +111,70 @@ class Controller:
         except ValueError:
             return status, None
 
+    def stream(self, path):
+        """Open a long-lived GET (e.g. /logs). Returns (closer, binary file positioned after the headers);
+        raises OSError if it can't be opened or isn't HTTP 200."""
+        if self.kind == "pipe":
+            f = open(self.addr, "r+b", buffering=0)
+            f.write(self._request("GET", path))
+            closer = f
+        else:
+            sock = self._connect(10)
+            sock.settimeout(None)
+            sock.sendall(self._request("GET", path))
+            f, closer = sock.makefile("rb"), sock
+        status = f.readline().split(b" ", 2)
+        if len(status) < 2 or status[1] != b"200":
+            closer.close()
+            raise OSError(f"{path}: HTTP {status[1:2]}")
+        while f.readline().strip():  # skip the headers
+            pass
+        return closer, f
+
     def version(self, timeout=3):
         """(http_status, mihomo version or None)."""
         status, body = self.call("GET", "/version", timeout=timeout)
         ok = status == 200 and isinstance(body, dict) and "version" in body
         return status, body["version"] if ok else None
+
+
+class LogWatcher:
+    """Collects mihomo's warning/error log messages in the background. The API streams them even when the
+    client's own log level is quieter (checked with log-level silent)."""
+
+    def __init__(self, ctl):
+        self.ctl, self.messages, self._stopped, self._closer = ctl, [], False, None
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def _run(self):
+        while not self._stopped:
+            try:
+                self._closer, f = self.ctl.stream("/logs?level=warning")
+                for line in f:
+                    try:
+                        self.messages.append(str(json.loads(line).get("payload", "")))
+                    except ValueError:
+                        pass
+            except OSError:
+                pass
+            if not self._stopped:
+                time.sleep(1)  # reconnect (e.g. mihomo restarted its API)
+
+    def mark(self):
+        return len(self.messages)
+
+    def since(self, mark):
+        return self.messages[mark:]
+
+    def stop(self):
+        self._stopped = True
+        try:
+            if isinstance(self._closer, socket.socket):
+                self._closer.shutdown(socket.SHUT_RDWR)  # wakes the blocked read
+            if self._closer:
+                self._closer.close()
+        except OSError:
+            pass
 
 
 @functools.lru_cache(maxsize=None)
@@ -350,15 +414,34 @@ def list_servers(ctl):
     return [{"name": n, "type": types[n], "path": paths.get(n)} for n in order]
 
 
-def config_hosts(names):
-    """name -> server host from the config file that matches the most server names (fallback only)."""
+def _provider_files(cfg, config_path):
+    """Local copies of a config's proxy providers (mihomo keeps them relative to its home directory)."""
+    home = os.path.dirname(config_path)
+    files = []
+    for name, prov in (cfg.get("proxy-providers") or {}).items():
+        if not isinstance(prov, dict):
+            continue
+        if prov.get("path"):
+            files.append(os.path.normpath(os.path.join(home, str(prov["path"]))))
+        else:  # no path: mihomo names the file after a hash of the URL
+            files += glob.glob(os.path.join(home, "proxies", "*"))
+    return files
+
+
+def config_servers(names):
+    """name -> {server, port, type} from the config (and its provider files) that matches the most
+    server names. Used for the fallback ping and the direct TCP check."""
     best, want = {}, set(names)
     for path in config_files():
         cfg = load_yaml(path)
         if not cfg:
             continue
-        m = {p["name"]: str(p.get("server", "")) for p in (cfg.get("proxies") or [])
-             if isinstance(p, dict) and p.get("name") in want and p.get("server")}
+        proxies = list(cfg.get("proxies") or [])
+        for f in _provider_files(cfg, path):
+            proxies += (load_yaml(f) or {}).get("proxies") or [] if os.path.isfile(f) else []
+        m = {p["name"]: {"server": str(p.get("server", "")), "port": p.get("port"),
+                         "type": str(p.get("type", "")).lower()}
+             for p in proxies if isinstance(p, dict) and p.get("name") in want and p.get("server")}
         if len(m) > len(best):
             best = m
     return best

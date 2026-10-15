@@ -1,19 +1,37 @@
 """The per-server test (curl, ping) and the run loop that tests every server."""
+import collections
 import concurrent.futures as cf
+import errno
 import os
 import re
 import shutil
+import socket
 import statistics
 import tempfile
 import time
 
-from .mihomo import MihomoState, config_hosts, mihomo_resolve, remote_ip
+from .mihomo import LogWatcher, MihomoState, config_servers, mihomo_resolve, remote_ip
 from .system import CURL, IS_MAC, IS_WIN, NULL_DEV, run
 
 PROBE_URL = "http://www.gstatic.com/generate_204"
 DOWN_URL = "https://speed.cloudflare.com/__down?bytes={n}"
 UP_URL = "https://speed.cloudflare.com/__up"
 RESULTS = ("ok", "partial", "unreachable", "failed")
+SLOW_START = 3  # seconds to the first response through a newly selected server before it's flagged
+UDP_TYPES = {"hysteria", "hysteria2", "tuic", "wireguard"}  # no TCP port to check directly
+# mihomo's connection error -> plain meaning; first match wins
+CAUSES = [
+    (r"missing port in address|too many colons|invalid (address|port)|unknown network",
+     "config error: invalid server address"),
+    (r"no such host|lookup .*(fail|refused|timeout)|resolve|dns", "server name doesn't resolve"),
+    (r"network is unreachable|no route to host", "no route to the server (e.g. no IPv6)"),
+    (r"operation not permitted|permission denied", "blocked by a firewall on this computer"),
+    (r"connection refused", "server refused the connection"),
+    (r"auth|password|unauthori[sz]ed|invalid user|uuid", "server rejected the credentials"),
+    (r"tls|x509|certificate", "TLS/certificate problem"),
+    (r"i/o timeout|timed out|deadline exceeded|no recent network activity", "connection timed out"),
+    (r"reset by peer|eof|broken pipe|closed", "connection cut (by the server or the network)"),
+]
 
 
 def curl(proxy, url, extra=(), max_time=20):
@@ -51,18 +69,52 @@ def ping(ip, count=4):
     return statistics.mean(times), round(100 * (1 - len(times) / count))
 
 
-def test_server(ctl, state, proxy, srv, size, timeout, up_file):
+def classify(error):
+    for pattern, meaning in CAUSES:
+        if re.search(pattern, error, re.I):
+            return meaning
+    return "mihomo could not connect through this server"
+
+
+def dial_error(messages):
+    """The most common server-connection error in mihomo's log messages, or ''."""
+    errors = [m.split(" error: ", 1)[1].strip() for m in messages
+              if m.startswith(("[TCP] dial", "[UDP] dial")) and " error: " in m]
+    return collections.Counter(errors).most_common(1)[0][0] if errors else ""
+
+
+def tcp_check(host, port, timeout=5):
+    """Plain TCP connect, outside mihomo: 'open', 'refused', 'no answer', 'no route' or another error."""
+    try:
+        socket.create_connection((host, int(port)), timeout=timeout).close()
+        return "open"
+    except ConnectionRefusedError:
+        return "refused"
+    except socket.timeout:
+        return "no answer"
+    except OSError as e:
+        return "no route" if e.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH) else str(e)
+
+
+def add_note(r, text):
+    r["note"] = f"{r['note']}; {text}" if r["note"] else text
+
+
+def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
     r = {"name": srv["name"], "type": srv["type"], "ip": None, "ping": None, "loss": None,
-         "down": None, "up": None, "result": "", "note": ""}
+         "down": None, "up": None, "first": None, "result": "", "note": "", "error": "", "check": ""}
+    mark = logs.mark()
     if not state.select(srv):
         r["result"], r["note"] = "failed", ("mihomo would not select this server" if srv.get("path")
                                             else "no selector group contains this server, so it can't be selected")
         return r
     # warm-up: the first connection through a newly selected server can take a few seconds
-    deadline, rc = time.time() + 10, -1
+    t0 = time.time()
+    deadline, rc = t0 + 10, -1
     while time.time() < deadline:
         rc, code, _, _ = curl(proxy, PROBE_URL, max_time=8)
         if code in (200, 204):
+            r["first"] = time.time() - t0
             break
         time.sleep(1)
     reached = rc == 0
@@ -84,16 +136,26 @@ def test_server(ctl, state, proxy, srv, size, timeout, up_file):
             if urc == 28:
                 r["note"] = (r["note"] + "; " if r["note"] else "") + "slow: upload hit the time limit"
             break
+    worked = r["down"] is not None or r["up"] is not None
+    if r["first"] is not None and r["first"] > SLOW_START:
+        add_note(r, f"slow start: first response after {r['first']:.0f} s")
+    elif r["first"] is None and worked:
+        add_note(r, "slow start: no response in the first 10 s")
     if r["down"] is not None and r["up"] is not None:
         r["result"] = "ok"
-    elif r["down"] is None and r["up"] is None:
+        return r
+    r["error"] = dial_error(logs.since(mark))
+    if not worked:
         r["result"] = "failed"
-        r["note"] = ("mihomo could not connect through this server" if drc not in (0, 28)
-                     else "timed out" if drc == 28 else f"HTTP {dcode}")
+        cause = (classify(r["error"]) if r["error"] or drc not in (0, 28)
+                 else "timed out" if drc == 28 else f"HTTP {dcode}")
+        r["note"] = f"{cause}; {r['note']}" if r["note"] else cause
     else:
         r["result"] = "partial"
-        r["note"] = ("upload failed" if r["up"] is None else "download failed") + \
-                    (f"; {r['note']}" if r["note"] else "")
+        failed = "upload failed" if r["up"] is None else "download failed"
+        if r["error"]:
+            failed += f" ({classify(r['error'])})"
+        r["note"] = f"{failed}; {r['note']}" if r["note"] else failed
     return r
 
 
@@ -127,38 +189,54 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
     with open(up_file, "wb") as f:
         f.write(os.urandom(int(size * 500_000)))
     pinger = cf.ThreadPoolExecutor(max_workers=8)
-    pings = {}
+    pings, checks, logs = {}, {}, None
     try:
         proxy = state.proxy_url()
         state.apply()
+        logs = LogWatcher(ctl)
         for i, srv in enumerate(servers, 1):
             left = (time.time() - t0) / (i - 1) * (len(servers) - i + 1) if i > 1 else est
             emit("server", {"index": i, "total": len(servers), "server": srv, "left": left})
-            r = test_server(ctl, state, proxy, srv, size, timeout, up_file)
+            r = test_server(ctl, state, proxy, srv, size, timeout, up_file, logs)
             results.append(r)
             if r["ip"]:
                 pings[r["name"]] = pinger.submit(ping, r["ip"])
-        # servers mihomo never connected to: ping the address from the config, resolved by mihomo
-        missing = [r for r in results if r["name"] not in pings]
-        hosts = config_hosts([r["name"] for r in missing]) if missing else {}
-        for r in missing:
-            ip = mihomo_resolve(ctl, hosts[r["name"]]) if r["name"] in hosts else None
-            if ip:
+        # servers mihomo never connected to: ping the address from the config, resolved by mihomo;
+        # failed servers also get a direct TCP check of their port, outside mihomo
+        need = [r for r in results if r["name"] not in pings or r["result"] == "failed"]
+        conf = config_servers([r["name"] for r in need]) if need else {}
+        for r in need:
+            c = conf.get(r["name"]) or {}
+            ip = r["ip"] or (mihomo_resolve(ctl, c["server"]) if c.get("server") else None)
+            if ip and r["name"] not in pings:
                 pings[r["name"]] = pinger.submit(ping, ip)
+            if r["result"] == "failed":
+                if r["type"] in UDP_TYPES:
+                    r["check"] = "not possible (UDP)"
+                elif ip and c.get("port"):
+                    checks[r["name"]] = (c["port"], pinger.submit(tcp_check, ip, c["port"]))
         emit("pinging", {})
         for r in results:
             if r["name"] in pings:
                 r["ping"], r["loss"] = pings[r["name"]].result()
                 if r["result"] == "failed" and r["ping"] is not None:
                     r["result"] = "unreachable"
-                    r["note"] = "answers ping, but no working proxy connection from this network"
+                    if not r["error"]:
+                        r["note"] = "answers ping, but no working proxy connection from this network"
+            if r["name"] in checks:
+                port, fut = checks[r["name"]]
+                r["check"] = f"port {port} {fut.result()}"
+            if r["check"]:
+                add_note(r, "direct check: " + r["check"])
     except KeyboardInterrupt:
         stopped = True
         emit("stopped", {})
     finally:
+        if logs:
+            logs.stop()
         state.restore()
-        for f in pings.values():  # when stopped, don't wait for queued pings at exit
-            f.cancel()
+        for f in list(pings.values()) + [fut for _, fut in checks.values()]:
+            f.cancel()  # when stopped, don't wait for queued pings/checks at exit
         pinger.shutdown(wait=False)
         shutil.rmtree(tmp, ignore_errors=True)
     emit("restored", {"state": state})
