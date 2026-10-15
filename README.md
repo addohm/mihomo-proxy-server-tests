@@ -6,7 +6,7 @@ mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Me
 
 ```bash
 python3 mihomo_speedtest.py                      # test everything
-python3 mihomo_speedtest.py --filter "^Japan$"   # only matching servers
+python3 mihomo_speedtest.py --filter "Japan"     # only matching servers
 ```
 
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end

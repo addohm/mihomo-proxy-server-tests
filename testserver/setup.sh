@@ -9,19 +9,18 @@
 #
 # Settings (environment variables):
 #   SUB_URL         required. Subscription URL (Clash/mihomo YAML profile, or a list of share links)
-#   MIHOMO_VERSION  default v1.19.32 (same as the user's desktop)
-#   TUN             1 = enable TUN at rest like a desktop client (the speed test turns it off and back on).
+#   MIHOMO_VERSION  e.g. v1.19.32. Default: the latest release
+#   TUN             1 = enable TUN at rest, as many clients do (the speed test turns it off and back on).
 #                   The SSH client's IP is excluded from TUN routing so the session survives. Default 0.
-#   SUB_UA          User-Agent for fetching the subscription (default looks like Clash Verge, so providers
-#                   return a full mihomo profile)
+#   SUB_UA          User-Agent for fetching the subscription (default looks like a mihomo client, so
+#                   providers return a full mihomo profile)
 #
 # Everything listens on 127.0.0.1 only: controller 127.0.0.1:9090 (random secret), mixed-port 7890.
 set -euo pipefail
 
 SUB_URL="${SUB_URL:?set SUB_URL to the subscription URL}"
-MIHOMO_VERSION="${MIHOMO_VERSION:-v1.19.32}"
+MIHOMO_VERSION="${MIHOMO_VERSION:-latest}"
 TUN="${TUN:-0}"
-SUB_UA="${SUB_UA:-clash-verge/v2.4.2 mihomo/${MIHOMO_VERSION#v}}"
 DIR=/etc/mihomo
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
@@ -30,6 +29,11 @@ grep -qi fedora /etc/os-release || echo "Warning: not Fedora; continuing anyway.
 echo "==> Packages"
 dnf -y -q install curl iputils python3 python3-pyyaml gzip </dev/null
 
+if [ "$MIHOMO_VERSION" = latest ]; then
+    MIHOMO_VERSION="$(curl -fsSL https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
+        | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["tag_name"])')"
+fi
+SUB_UA="${SUB_UA:-clash.meta mihomo/${MIHOMO_VERSION#v}}"
 echo "==> mihomo $MIHOMO_VERSION"
 case "$(uname -m)" in
     x86_64)  asset="mihomo-linux-amd64-compatible-$MIHOMO_VERSION.gz" ;;  # runs on any x86-64 CPU

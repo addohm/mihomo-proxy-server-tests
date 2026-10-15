@@ -45,6 +45,11 @@ Planned work, not started. Nothing here is being executed yet.
 - **Ping timing** — pings run while the next server's download is going, which can add a little latency.
   Could ping between transfers instead, at the cost of a slower run.
 
+- **Config variations on the test server** — `testserver/setup.sh` options to switch the core between
+  the setups the script must handle (TCP / Unix-socket controller, with and without secret, mixed / socks /
+  http / no proxy port, TUN on / off, full profile vs provider-only), so each discovery and restore path
+  can be checked.
+
 ## Small cleanups
 
 - Reject `--size` values of 0 or below.

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Single-file tool: `mihomo_speedtest.py` tests every server in the user's **running** mihomo, exactly as
+Single-file tool: `mihomo_speedtest.py` tests every server in a **running** mihomo, exactly as
 mihomo uses it, and writes a Markdown + CSV report. `context.md` is the original handoff (2026-10-09), kept
 as a frozen snapshot for background; this file is the living summary. Keep this file, README and the
 script's docstring in sync when behaviour or options change.
@@ -14,8 +14,10 @@ script's docstring in sync when behaviour or options change.
   See "Remote test server" below.
 - Static checks are fine: `python3 -m py_compile mihomo_speedtest.py`.
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
-- Stay universal: Linux, Windows, macOS and **any mihomo-based client** (Clash Verge Rev, Mihomo Party,
-  Nyanpasu, FlClash, ClashX Meta, plain mihomo). Nothing Clash-Verge-specific.
+- **Public tool.** Stay universal: Linux, Windows, macOS and **any mihomo-based client** (Clash Verge Rev,
+  Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo) and any configuration (TCP/Unix/pipe controller,
+  with or without secret, mixed/socks/http port or none, TUN on or off, profiles or providers). Never tune it
+  to one particular machine, client or network.
 - Standard library only. PyYAML stays optional. No mihomo binary needed.
 
 ## What it must be (settled — do not redesign)
@@ -33,7 +35,7 @@ Explicitly rejected — do not reintroduce:
 
 ```bash
 python3 mihomo_speedtest.py                                   # everything, no prompts
-python3 mihomo_speedtest.py --filter "Daily Usage 1|^Japan$"  # subset by regex
+python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 ```
 
 Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout SEC` (25),
@@ -63,7 +65,7 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
 8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). Falls back
    to cwd, then the temp dir, if `--out` isn't writable. Reports are git-ignored.
 
-Estimate ≈ `servers × (6 + 1.4 × size)` s (14m40 est. vs 14m17 actual for 44 servers).
+Estimate ≈ `servers × (6 + 1.4 × size)` s.
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.cloudflare.com/__down` / `__up`.
 
 ## Remote test server
@@ -76,22 +78,8 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
 - SSH key: `~/.ssh/mihomo-testserver` (dedicated to this server). Host: not set up yet.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
 - To test: copy the current `mihomo_speedtest.py` over with `scp` and run it there, as root.
-- The VPS is not in mainland China, so per-server results won't match the user's (e.g. the blocked trojan
-  ports). Use it to check that the script works (discovery, state restore, labels, reports), not to judge
-  servers.
-
-## User's setup (known findings — don't re-investigate)
-
-- Mainland China. Fedora/Nobara, Clash Verge Rev, mihomo v1.19.32. API at
-  `unix:/run/clash-verge-service/users/1000/verge-mihomo.sock`, mixed-port 7897, normally TUN on + rule mode,
-  GLOBAL `DIRECT`. Runtime config is root-owned; profiles in
-  `~/.local/share/io.github.clash-verge-rev.clash-verge-rev/profiles/`.
-- Provider hostnames only resolve via private DoH in `nameserver-policy` — using mihomo itself avoids this.
-- Most plain `trojan` servers are **genuinely unreachable** from this network (blocked port, e.g. 43000):
-  they answer ICMP, TCP to the port times out, the client's own delay test fails. They work only when chained
-  through a vless server. Real result, not a script bug.
-  Working: Canada, Hong Kong, TORRENTING SERVER (France) trojans, all `[RLT][CN]` vless, trixu-hy2.
-  `[TEST][IPV6]` servers fail (no route). Turkey fails entirely.
+- Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
+  per-server results depend on the network the test runs from.
 
 ## Open items
 
@@ -101,5 +89,5 @@ until the user says so.
 
 - First real run on **Windows** (`curl.exe`, named-pipe API, localised `ping` parsing,
   `Get-CimInstance` discovery) and **macOS** — those paths are written but have never run.
-- A full 44-server Linux run with the latest changes (unreachable label, slow-upload handling,
-  progress-line trimming) hasn't been done; a 3-server run confirmed the labels and note.
+- A full run with the latest changes (unreachable/failed notes, restore signal handling, direct
+  curl/ping calls) hasn't been done yet.
