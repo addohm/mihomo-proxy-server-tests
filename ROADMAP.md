@@ -1,6 +1,6 @@
 # Roadmap
 
-Planned work, not started. Nothing here is being executed yet.
+Planned work. Done items are removed (see git history).
 
 ## Decided
 
@@ -42,7 +42,6 @@ Planned work, not started. Nothing here is being executed yet.
 - **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
 - **Skip transfers for dead servers** — if the warm-up never got a response, skip download/upload (saves
   ~20 s per dead server; trade-off against the "first connection is slow" problem the warm-up handles).
-- **macOS IPv6 ping** — use `ping6` for IPv6 addresses on macOS.
 - **Speed excluding connection setup** — curl's average speed includes connecting and the TLS handshake,
   so far-away servers look slower on a 10 MB test. Could compute speed from the transfer phase only
   (curl's `time_starttransfer`), or just document it.
@@ -59,10 +58,3 @@ Planned work, not started. Nothing here is being executed yet.
   the setups the script must handle (TCP / Unix-socket controller, with and without secret, mixed / socks /
   http / no proxy port, TUN on / off, full profile vs provider-only), so each discovery and restore path
   can be checked.
-
-## Small cleanups
-
-- Reject `--size` values of 0 or below.
-- Ctrl+C during the final ping phase can wait up to ~15 s before exiting; stop pending pings instead.
-- Process discovery and config files are read and parsed twice (`find_controller` and `config_hosts`);
-  cache them.

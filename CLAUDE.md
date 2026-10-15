@@ -38,7 +38,7 @@ python3 mihomo_speedtest.py                                   # everything, no p
 python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 ```
 
-Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout SEC` (25),
+Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
 `--out DIR` (default: next to the script).
 
@@ -58,7 +58,10 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
    (curl rc 28) keep their speed with a "slow: … hit the time limit" note.
 6. Ping the IP mihomo **actually dialed** (`remote_ip`: `/connections` → `metadata.remoteDestination`, polled
    during the download). Servers that never connect fall back to the config's `server` host resolved through
-   mihomo's DNS (`config_hosts` + `mihomo_resolve` via `/dns/query`). Pings run in a thread pool.
+   mihomo's DNS (`config_hosts` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6 literals is
+   stripped). Pings run in a thread pool; queued pings are cancelled on Ctrl+C. macOS: `ping -W` is in ms,
+   IPv6 uses `ping6`.
+   Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
    `UNREACHABLE_NOTE` / `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean
    the server refused the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.

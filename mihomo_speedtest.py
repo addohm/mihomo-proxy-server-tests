@@ -28,6 +28,7 @@ import argparse
 import concurrent.futures as cf
 import csv
 import datetime
+import functools
 import getpass
 import glob
 import ipaddress
@@ -47,6 +48,7 @@ import unicodedata
 import urllib.parse
 
 IS_WIN = os.name == "nt"
+IS_MAC = sys.platform == "darwin"
 NULL_DEV = "NUL" if IS_WIN else "/dev/null"
 PROBE_URL = "http://www.gstatic.com/generate_204"
 DOWN_URL = "https://speed.cloudflare.com/__down?bytes={n}"
@@ -149,7 +151,12 @@ def curl(proxy, url, extra=(), max_time=20):
 
 def ping(ip, count=4):
     """ICMP ping. Returns (avg_ms | None, loss_pct | None)."""
-    args = ["ping", "-n", str(count), "-w", "2000", ip] if IS_WIN else ["ping", "-c", str(count), "-W", "2", ip]
+    if IS_WIN:
+        args = ["ping", "-n", str(count), "-w", "2000", ip]
+    elif IS_MAC:  # macOS: -W is in milliseconds, and IPv6 needs ping6 (which has no -W)
+        args = ["ping6", "-c", str(count), ip] if ":" in ip else ["ping", "-c", str(count), "-W", "2000", ip]
+    else:
+        args = ["ping", "-c", str(count), "-W", "2", ip]
     _, out, _ = run(args, timeout=count * 3 + 5)
     # A reply line has exactly one "=12.3 ms" / "<1ms" value in any language; the Windows summary line
     # ("Minimum = 12ms, Maximum = ..., Average = ...") has three, and the Linux/macOS one uses "a/b/c ms".
@@ -272,6 +279,7 @@ class Controller:
             return status, None
 
 
+@functools.lru_cache(maxsize=None)
 def running_cores():
     """Command lines of running mihomo / clash processes."""
     if IS_WIN:
@@ -301,6 +309,7 @@ def tcp_addr(value):
     return f"{host}:{port}" if port.isdigit() else None
 
 
+@functools.lru_cache(maxsize=None)
 def load_yaml(path):
     try:
         import yaml
@@ -311,6 +320,7 @@ def load_yaml(path):
         return None
 
 
+@functools.lru_cache(maxsize=None)
 def config_files():
     """Config files of running cores first, then the usual locations of mihomo and GUI clients."""
     home = os.path.expanduser("~")
@@ -502,16 +512,19 @@ def config_hosts(names):
 
 
 def mihomo_resolve(ctl, host):
-    """Resolve with mihomo's own DNS (its nameserver-policy etc.)."""
+    """Resolve with mihomo's own DNS (its nameserver-policy etc.). IPv4 first, then IPv6."""
+    host = host.strip("[]")  # some profiles write IPv6 servers as "[2001:db8::1]"
     try:
         ipaddress.ip_address(host)
         return host
     except ValueError:
         pass
-    st, body = ctl.call("GET", "/dns/query?" + urllib.parse.urlencode({"name": host, "type": "A"}), timeout=8)
-    for a in ((body or {}).get("Answer") or []) if st == 200 else []:
-        if a.get("type") == 1:
-            return a.get("data")
+    for qtype, rtype in (("A", 1), ("AAAA", 28)):
+        st, body = ctl.call("GET", "/dns/query?" + urllib.parse.urlencode({"name": host, "type": qtype}),
+                            timeout=8)
+        for a in ((body or {}).get("Answer") or []) if st == 200 else []:
+            if a.get("type") == rtype:
+                return a.get("data")
     return None
 
 
@@ -633,12 +646,21 @@ def save_reports(results, meta, out_dir):
 
 
 # ------------------------------------------------------------------------ main
+def positive(kind):
+    def parse(v):
+        n = kind(v)
+        if n <= 0:
+            raise argparse.ArgumentTypeError(f"must be greater than 0, got {v}")
+        return n
+    return parse
+
+
 def main():
     ap = argparse.ArgumentParser(description="Test every server in your running mihomo.",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     ap.add_argument("--filter", help="only test servers whose name matches this regex")
-    ap.add_argument("--size", type=float, default=10, help="download MB per server (upload is half). Default 10")
-    ap.add_argument("--timeout", type=int, default=25, help="max seconds per transfer. Default 25")
+    ap.add_argument("--size", type=positive(float), default=10, help="download MB per server (upload is half). Default 10")
+    ap.add_argument("--timeout", type=positive(int), default=25, help="max seconds per transfer. Default 25")
     ap.add_argument("--api", help="controller address, if not found automatically")
     ap.add_argument("--secret", default="", help="controller secret (or MIHOMO_SECRET)")
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)), help="report folder")
@@ -708,6 +730,8 @@ def main():
         print(warn("\nStopped - showing the servers tested so far."))
     finally:
         state.restore()
+        for f in pings.values():  # on Ctrl+C, don't wait for queued pings at exit
+            f.cancel()
         pinger.shutdown(wait=False)
         shutil.rmtree(tmp, ignore_errors=True)
     print(dim(f"\nmihomo restored: {state.describe()}."))
