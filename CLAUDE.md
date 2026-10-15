@@ -81,6 +81,10 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.
 
 ## Open items
 
+Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items
+until the user says so.
+
+
 - First real run on **Windows** (`curl.exe`, named-pipe API, localised `ping` parsing,
   `Get-CimInstance` discovery) and **macOS** — those paths are written but have never run.
 - A full 44-server Linux run with the latest changes (unreachable label, slow-upload handling,

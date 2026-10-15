@@ -16,3 +16,5 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 Requirements: Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all options.
 
 Status: in use on Linux. Windows and macOS support is written but not yet tested.
+
+Planned features: see [ROADMAP.md](ROADMAP.md).

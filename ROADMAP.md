@@ -1,0 +1,35 @@
+# Roadmap
+
+Planned work, not started. Nothing here is being executed yet.
+
+## Decided
+
+- **GUI as a local web page** (decided 2026-10-15). The script runs a small stdlib web server and opens a page
+  in the user's normal browser: live results table, server checkboxes instead of `--filter`, sortable
+  columns, a "restoring your settings" indicator, per-server diagnosis on click, run history.
+  - Why: one language (Python) plus one HTML/JS page on every OS, no extra dependencies, no build
+    toolchain. A regular browser renders the same everywhere, unlike Tauri-style system webviews
+    (WebKitGTK on Linux is Clash Verge Rev's main source of UI bugs).
+  - Rejected: Tkinter (dated, weak live tables/charts), Qt/PySide6 (~200 MB dependency), Tauri/Electron
+    (second language and build toolchain).
+  - Later, optionally: a single-file PyInstaller bundle per OS that opens the page, so users don't need Python.
+
+## Ideas (not yet decided)
+
+- **Split engine from interface** — core module (controller discovery, state save/restore, per-server
+  tests, reports) that reports progress step by step; CLI and GUI become thin layers on top. Prerequisite
+  for the GUI.
+- **mihomo's own failure reason** — read mihomo's log through the API during each test to show the exact
+  error (dial timeout, connection refused, auth failure).
+- **Direct TCP connect check** — plain TCP connect to `server:port` outside mihomo: a timeout means the port
+  is blocked; it opens but mihomo fails means the server refuses (credentials/settings). TCP only, not
+  hy2/tuic (UDP).
+- **Traceroute on failure** — ICMP traceroute is useless for "unreachable" servers (ICMP already gets
+  through); they need a TCP traceroute to the proxy port (Linux: `traceroute -T -p PORT` needs root, or
+  `tcptraceroute`; Windows has nothing built in). ICMP traceroute is still useful for "failed" servers.
+- **Latency through the proxy** — add mihomo's delay test (`/proxies/{name}/delay`) as a column next to the
+  direct ping.
+- **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
+- **Skip transfers for dead servers** — if the warm-up never got a response, skip download/upload (saves
+  ~20 s per dead server; trade-off against the "first connection is slow" problem the warm-up handles).
+- **macOS IPv6 ping** — use `ping6` for IPv6 addresses on macOS.
