@@ -54,9 +54,12 @@ Planned work. Done items are removed (see git history).
   first response from curl's `time_starttransfer`. Report the median as a "Conn ms" column, and probe
   failures in the Note column ("2 of 5 connections failed") as a through-the-server stability measure.
   About 2–5 s per working server. Decided: 5 probes. Jitter is folded in here (see next item).
-- **Jitter** — variation between the ping times the script already collects (mean difference between
-  consecutive replies), as a column next to ping and loss. About 2 lines; consider a few more pings per
-  server so the number means something.
+- **Jitter** (folded into connection time) — average change between consecutive measurements, two kinds:
+  through the server (from the 5 connection probes) and direct (from the pings). Comparing them separates
+  "the server/its route wobbles" from "your own network wobbles".
+  - Decided: show **both** in the terminal table and the reports (helps troubleshooting). The table is
+    already ~100 characters wide, so rework column widths/headers when adding them.
+  - Decided: 10 pings per server instead of 4 (pings run in the background; ~6 s extra at the end only).
 - **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
 - **Flag slow starters** (replaces "skip transfers for dead servers", rejected: never skip a server that
   might start — "if it starts, it starts"). Always run the transfers as today, and record how long the
