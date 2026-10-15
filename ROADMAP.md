@@ -49,10 +49,11 @@ Planned work. Done items are removed (see git history).
     query Team Cymru's ASN TXT records through mihomo's own DNS (`/dns/query`, the resolver the user's
     config already makes work on their network), fall back to whois.cymru.com on TCP 43, otherwise show
     the IP only. Only runs with `--trace`; document that hop IPs are sent to that lookup service.
-- **Connection time through the server** (replaces "latency through the proxy") — report how long it takes
-  to get a response through the server, from curl's own timing (`time_starttransfer` / `time_appconnect`) on
-  the calls the script already makes. Shows servers that work but feel sluggish (many short connections
-  while browsing). About 3 lines.
+- **Connection time through the server** (replaces "latency through the proxy") — right after the
+  warm-up, 5 quick probes, each a new connection through the server to a tiny page (`generate_204`); time to
+  first response from curl's `time_starttransfer`. Report the median as a "Conn ms" column, and probe
+  failures in the Note column ("2 of 5 connections failed") as a through-the-server stability measure.
+  About 2–5 s per working server. Decided: 5 probes. Jitter is folded in here (see next item).
 - **Jitter** — variation between the ping times the script already collects (mean difference between
   consecutive replies), as a column next to ping and loss. About 2 lines; consider a few more pings per
   server so the number means something.
