@@ -12,6 +12,12 @@ Planned work. Done items are removed (see git history).
     (WebKitGTK on Linux is Clash Verge Rev's main source of UI bugs).
   - Rejected: Tkinter (dated, weak live tables/charts), Qt/PySide6 (~200 MB dependency), Tauri/Electron
     (second language and build toolchain).
+  - **One core, one program.** `mihomotest/` is the single core; the CLI and the GUI are thin layers on it.
+    Two ways to get the *same* program:
+    - from source: `python3 mihomo_speedtest.py` — terminal by default, `--gui` opens the page;
+    - packaged executable: **no arguments (double-click) → GUI; any arguments (e.g. `--cli`, `--filter`) →
+      terminal**. Windows build is a console program (its window shows "running in your browser; close this
+      window to quit"); macOS ships a `.app` (terminal use = the binary inside it); Linux a single file.
   - **Layman first.** The GUI is the main product, designed for people who never open a terminal. Their
     entry point is a packaged app (double-click; no Python, no flags), which opens the GUI by default —
     so packaging is a required part of the GUI deliverable, not optional.
