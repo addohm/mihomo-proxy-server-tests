@@ -11,7 +11,7 @@ script's docstring in sync when behaviour or options change.
   explicitly says to.** It turns TUN off and switches mode/selection on a live client. By default, give the
   exact command; the user runs it and reports back.
 - When the user does ask for a test, run it **only on the remote test server over SSH** — never locally.
-  (The SSH setup isn't done yet; until it is, there is nowhere to run tests, so ask.)
+  See "Remote test server" below.
 - Static checks are fine: `python3 -m py_compile mihomo_speedtest.py`.
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
 - Stay universal: Linux, Windows, macOS and **any mihomo-based client** (Clash Verge Rev, Mihomo Party,
@@ -65,6 +65,20 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s (14m40 est. vs 14m17 actual for 44 servers).
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.cloudflare.com/__down` / `__up`.
+
+## Remote test server
+
+A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`, config `/etc/mihomo/`,
+controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
+Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
+options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing).
+
+- SSH key: `~/.ssh/mihomo-testserver` (dedicated to this server). Host: not set up yet.
+- **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
+- To test: copy the current `mihomo_speedtest.py` over with `scp` and run it there, as root.
+- The VPS is not in mainland China, so per-server results won't match the user's (e.g. the blocked trojan
+  ports). Use it to check that the script works (discovery, state restore, labels, reports), not to judge
+  servers.
 
 ## User's setup (known findings — don't re-investigate)
 
