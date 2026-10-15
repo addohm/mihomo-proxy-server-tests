@@ -7,8 +7,11 @@ when behaviour or options change.
 
 ## Hard rules
 
-- **Never run the script, or any live test, yourself (not even in the background).** It turns TUN off and
-  switches mode/selection on the user's live client. Give the exact command; the user runs it and reports back.
+- **Never run or test the script locally, on any machine (not even in the background), unless the user
+  explicitly says to.** It turns TUN off and switches mode/selection on a live client. By default, give the
+  exact command; the user runs it and reports back.
+- When the user does ask for a test, run it **only on the remote test server over SSH** — never locally.
+  (The SSH setup isn't done yet; until it is, there is nowhere to run tests, so ask.)
 - Static checks are fine: `python3 -m py_compile mihomo_speedtest.py`.
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
 - Stay universal: Linux, Windows, macOS and **any mihomo-based client** (Clash Verge Rev, Mihomo Party,
