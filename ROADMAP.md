@@ -38,6 +38,17 @@ Planned work. Done items are removed (see git history).
 - **Traceroute on failure** — ICMP traceroute is useless for "unreachable" servers (ICMP already gets
   through); they need a TCP traceroute to the proxy port (Linux: `traceroute -T -p PORT` needs root, or
   `tcptraceroute`; Windows has nothing built in). ICMP traceroute is still useful for "failed" servers.
+  - Decided: off by default; `--trace` traces every failed server automatically. GUI later: a per-server
+    "trace this server" button plus a setting to trace automatically.
+  - Tools without root: `tracepath` (Linux), `traceroute` (macOS), `tracert` (Windows); limits ~20 hops,
+    short waits (~10–30 s per server). Note column: short summary ("path stops after hop 9 (IP)");
+    full trace in the Markdown report.
+  - Decided: TCP trace to the proxy port for "unreachable" servers when running as root/admin and a capable
+    tool exists; otherwise the note says "run with sudo for a port trace".
+  - Decided: show hop owners (ASN / network name), best-effort. Must work from inside mainland China:
+    query Team Cymru's ASN TXT records through mihomo's own DNS (`/dns/query`, the resolver the user's
+    config already makes work on their network), fall back to whois.cymru.com on TCP 43, otherwise show
+    the IP only. Only runs with `--trace`; document that hop IPs are sent to that lookup service.
 - **Connection time through the server** (replaces "latency through the proxy") — report how long it takes
   to get a response through the server, from curl's own timing (`time_starttransfer` / `time_appconnect`) on
   the calls the script already makes. Shows servers that work but feel sluggish (many short connections
