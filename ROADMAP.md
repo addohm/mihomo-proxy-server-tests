@@ -60,7 +60,19 @@ Planned work. Done items are removed (see git history).
   - Decided: show **both** in the terminal table and the reports (helps troubleshooting). The table is
     already ~100 characters wide, so rework column widths/headers when adding them.
   - Decided: 10 pings per server instead of 4 (pings run in the background; ~6 s extra at the end only).
-- **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
+- **Compare runs** — show what changed between runs: servers that stopped working / recovered, and big
+  swings in speed, connection time or ping.
+  - Decided: **explicit only, never automatic** (the tool is mostly used when problems are already seen).
+  - Baseline: `--save-baseline` saves this run as `baseline.csv` in the reports folder; `--compare` runs the
+    test and compares against the baseline; `--compare REPORT.csv` compares against a specific report.
+    Marking an older report as baseline = copy it over `baseline.csv` (document in README); GUI later:
+    "mark as baseline" button.
+  - When no baseline exists, one line at the end of a run: "Tip: run with --save-baseline when everything
+    works well, so you can compare later." No prompt.
+  - Servers matched by name (renamed = removed + new). "Big swing" = more than ~30% change.
+  - Reports record their speed method; speed changes aren't compared across methods (with a note).
+  - The comparison header shows both dates and warns that a baseline from another network or time of day
+    isn't a fair comparison.
 - **Flag slow starters** (replaces "skip transfers for dead servers", rejected: never skip a server that
   might start — "if it starts, it starts"). Always run the transfers as today, and record how long the
   first response through a newly selected server took. Flag it in the Note column: "slow start: first
