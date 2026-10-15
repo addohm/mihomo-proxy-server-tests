@@ -95,9 +95,10 @@ if isinstance(cfg.get("dns"), dict) and cfg["dns"].get("listen"):
 with open(p, "w", encoding="utf-8") as f:
     yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
 PY
+cp -p "$DIR/config.yaml" "$DIR/config.default.yaml"  # the default setup that variant.py builds on
 chown -R mihomo:mihomo "$DIR"
 chmod 750 "$DIR"
-chmod 640 "$DIR/config.yaml" "$DIR/subscription.raw"
+chmod 640 "$DIR/config.yaml" "$DIR/config.default.yaml" "$DIR/subscription.raw"
 
 echo "==> systemd service"
 cat > /etc/systemd/system/mihomo.service <<'UNIT'

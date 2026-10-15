@@ -5,7 +5,7 @@ decisions recorded (2026-10-15).
 
 ## Implementation order
 
-1. Config variations matrix (test tooling first, so every later change is checked)
+1. ~~Config variations matrix~~ — done (`testserver/variant.py`, `matrix.py`)
 2. Diagnosis: mihomo's failure reason, direct TCP check (+ provider cache lookup), slow-start flag
 3. Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic flag,
    CDN labels, table layout rework
@@ -138,11 +138,9 @@ decisions recorded (2026-10-15).
   - Decided: ping **all servers together at the end**, after every transfer has finished (addresses still
     collected during the run). ~15–20 s once per run; raise the ping pool size accordingly.
 
-- **Config variations on the test server** — check every discovery and restore path, not just the default
-  setup.
-  - Decided: `testserver/variant.sh` switches the test core into a variant (TCP / Unix-socket controller,
-    secret / none, mixed / socks / http / no port, TUN on / off, full profile / provider-only) and restarts
-    it; `testserver/matrix.sh` runs each variant **one change at a time** from the default (~8 short
-    2-server runs) and checks: mihomo found, servers tested, and mihomo's settings afterwards exactly as
-    before. Run before every release.
-  - Limit: Linux only; Windows/macOS paths stay untested (a Windows VM later if needed).
+## Testing other platforms
+
+- No Mac is available. macOS (and Windows) can be covered by GitHub Actions runners: a job that starts a
+  second local mihomo as a stand-in "server" (no subscription needed) and runs the script's real platform
+  paths (discovery, named pipe, ping parsing, curl, restore).
+- A Windows 11 VM is available (2026-10-15) for testing the Windows paths by hand.

@@ -98,7 +98,15 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
   host key pinned). Fedora 44, x86_64, ~450 MB RAM. Keep the IP out of the repo.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
-- To test: copy `mihomo_speedtest.py` and `mihomotest/` over with `scp -r` and run it there, as root.
+- To test: copy `mihomo_speedtest.py` and `mihomotest/` to `/root/mst/` with `scp -r` and run it there, as root.
+- **Config variations**: `testserver/variant.py` switches mihomo into a variant built from
+  `/etc/mihomo/config.default.yaml` (controller tcp/unix, secret yes/no, port mixed/socks/http/none, tun
+  off/on, source profile/provider); `testserver/matrix.py` runs the speed test on each variant one change at a
+  time and checks found / tested / restored / exit code, then returns to the default. Copy both to
+  `/root/testserver/`. **Run the matrix before every release and after changes to discovery, state or
+  restore.** It toggles TUN, so start it detached and poll the log:
+  `ssh mihomo-testserver 'SSH_IP=${SSH_CLIENT%% *} setsid nohup python3 /root/testserver/matrix.py
+  /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'`
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
