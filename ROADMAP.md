@@ -27,8 +27,13 @@ Planned work, not started. Nothing here is being executed yet.
 - **Traceroute on failure** — ICMP traceroute is useless for "unreachable" servers (ICMP already gets
   through); they need a TCP traceroute to the proxy port (Linux: `traceroute -T -p PORT` needs root, or
   `tcptraceroute`; Windows has nothing built in). ICMP traceroute is still useful for "failed" servers.
-- **Latency through the proxy** — add mihomo's delay test (`/proxies/{name}/delay`) as a column next to the
-  direct ping.
+- **Connection time through the server** (replaces "latency through the proxy") — report how long it takes
+  to get a response through the server, from curl's own timing (`time_starttransfer` / `time_appconnect`) on
+  the calls the script already makes. Shows servers that work but feel sluggish (many short connections
+  while browsing). About 3 lines.
+- **Jitter** — variation between the ping times the script already collects (mean difference between
+  consecutive replies), as a column next to ping and loss. About 2 lines; consider a few more pings per
+  server so the number means something.
 - **Compare runs** — compare two dated CSV reports to show servers that got slower or stopped working.
 - **Skip transfers for dead servers** — if the warm-up never got a response, skip download/upload (saves
   ~20 s per dead server; trade-off against the "first connection is slow" problem the warm-up handles).
