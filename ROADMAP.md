@@ -12,12 +12,20 @@ Planned work. Done items are removed (see git history).
     (WebKitGTK on Linux is Clash Verge Rev's main source of UI bugs).
   - Rejected: Tkinter (dated, weak live tables/charts), Qt/PySide6 (~200 MB dependency), Tauri/Electron
     (second language and build toolchain).
-  - Later, optionally: a single-file PyInstaller bundle per OS that opens the page, so users don't need Python.
-  - **Terminal mode stays** for machines without a desktop (servers, SSH sessions). Proposed: detect it
-    automatically (Linux with no `DISPLAY`/`WAYLAND_DISPLAY`, or an SSH session → terminal mode; Windows and
-    macOS → GUI), with `--cli` / `--gui` to override (e.g. `--cli` for scripts and cron). The web server
-    listens on localhost only, so `--gui` on a headless machine still works through an SSH tunnel
-    (`ssh -L PORT:localhost:PORT host`). Default behaviour to be confirmed with the user.
+  - **Layman first.** The GUI is the main product, designed for people who never open a terminal. Their
+    entry point is a packaged app (double-click; no Python, no flags), which opens the GUI by default —
+    so packaging is a required part of the GUI deliverable, not optional.
+  - **The script is the explicit/technical entry**: `python3 mihomo_speedtest.py` stays terminal-only
+    exactly as today (headless machines, scripts, cron); `--gui` opens the page from the script. No desktop
+    auto-detection.
+  - All options available in the GUI with defaults we establish: server checkboxes (replacing `--filter`),
+    trace and baseline controls up front; size, timeout, API address and secret under "Advanced". The secret
+    prompt becomes a field on the page.
+  - Reports and baseline: one **per-user folder** for both script and app (e.g. `Documents/mihomo-speedtest`),
+    `--out` still overrides. This changes the script's current default (next to the script).
+  - Security: the page listens on localhost only, and each launch uses a random secret token in the URL,
+    so other websites can't drive the local server (start tests / toggle TUN).
+  - Headless use of the GUI is still possible via an SSH tunnel (`ssh -L PORT:localhost:PORT host`).
 
 ## Ideas (not yet decided)
 
