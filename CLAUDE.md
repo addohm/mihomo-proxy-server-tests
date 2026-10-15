@@ -75,7 +75,8 @@ controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, ever
 Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
 options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing).
 
-- SSH key: `~/.ssh/mihomo-testserver` (dedicated to this server). Host: not set up yet.
+- Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
+  host key pinned). Fedora 44, x86_64, ~450 MB RAM. Keep the IP out of the repo.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
 - To test: copy the current `mihomo_speedtest.py` over with `scp` and run it there, as root.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:

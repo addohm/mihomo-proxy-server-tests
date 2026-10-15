@@ -40,14 +40,15 @@ case "$(uname -m)" in
     aarch64) asset="mihomo-linux-arm64-$MIHOMO_VERSION.gz" ;;
     *) echo "Unsupported CPU: $(uname -m)" >&2; exit 1 ;;
 esac
-if ! /usr/local/bin/mihomo -v 2>/dev/null | grep -q "$MIHOMO_VERSION"; then
+installed="$(/usr/local/bin/mihomo -v 2>/dev/null || true)"  # read it all: an early-closed pipe fails under pipefail
+if [[ "$installed" != *"$MIHOMO_VERSION"* ]]; then
     curl -fsSL "https://github.com/MetaCubeX/mihomo/releases/download/$MIHOMO_VERSION/$asset" \
         | gunzip > /usr/local/bin/mihomo.new
     chmod 755 /usr/local/bin/mihomo.new
     mv /usr/local/bin/mihomo.new /usr/local/bin/mihomo
     restorecon /usr/local/bin/mihomo 2>/dev/null || true
 fi
-/usr/local/bin/mihomo -v | head -1
+/usr/local/bin/mihomo -v | sed -n 1p
 
 echo "==> Config from subscription"
 id mihomo &>/dev/null || useradd --system --home-dir "$DIR" --shell /sbin/nologin mihomo
