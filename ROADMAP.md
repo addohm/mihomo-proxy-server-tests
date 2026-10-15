@@ -73,10 +73,16 @@ Planned work. Done items are removed (see git history).
     must state the method, so "compare runs" doesn't mix old and new speeds.
 - **Label CDN-fronted servers** — for servers behind a CDN (e.g. ws+tls via Cloudflare) the ping measures
   the CDN edge, not the server. Detect it (IP belongs to a known CDN range) and say so in the results.
-- **Other traffic during the test** — in global mode, the user's other apps also go through the server
-  under test, adding noise to the speeds. Options: warn in the report, or check `/connections` for
-  unrelated traffic during the transfer and flag noisy results. (Isolating the test from it was the
-  rejected "isolated core" / routing approach — don't reintroduce.)
+- **Other traffic during the test** — in global mode, the user's other proxied apps also go through the
+  server under test, lowering its measured speed. The script already polls `/connections` during each
+  download; use its per-connection byte counts to measure traffic that isn't the test's own.
+  - Decided: per server, Note "busy: other apps used ~N MB during this test" when other traffic exceeds
+    **5% of the test's own data and at least 1 MB**. At the start, one informational line (no prompt) if
+    other traffic exceeds ~1 MB/s in a 2-second sample. All three numbers are single constants; tune after
+    real runs.
+  - Limit (document it): apps that don't use the proxy bypass mihomo and can't be seen.
+  - Isolating the test from this traffic was the rejected "isolated core" / routing approach — don't
+    reintroduce.
 - **Ping timing** — pings currently run while the next server's download fills the connection, inflating
   ping and (now) direct jitter, which would wrongly blame the user's own network.
   - Decided: ping **all servers together at the end**, after every transfer has finished (addresses still
