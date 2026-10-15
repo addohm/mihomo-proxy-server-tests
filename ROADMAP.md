@@ -18,6 +18,13 @@ Planned work. Done items are removed (see git history).
     - packaged executable: **no arguments (double-click) → GUI; any arguments (e.g. `--cli`, `--filter`) →
       terminal**. Windows build is a console program (its window shows "running in your browser; close this
       window to quit"); macOS ships a `.app` (terminal use = the binary inside it); Linux a single file.
+  - **Packaging (decided):** builds for Windows x64, macOS (Apple Silicon + Intel) and Linux x86-64, made by
+    **GitHub Actions** on each tagged release and published on the Releases page. Keep the workflow minimal:
+    read-only by default, `contents: write` only on the release job, no other secrets, pinned action
+    versions; review `.github/workflows/` before each release. **No paid signing**: Windows unsigned, macOS
+    ad-hoc signed only (free; PyInstaller does it, and Apple Silicon needs it to run at all), Linux none.
+    Publish SHA-256 checksums with each release. README gets illustrated first-run steps for SmartScreen
+    ("More info → Run anyway") and Gatekeeper (System Settings → Privacy & Security → "Open Anyway").
   - **Layman first.** The GUI is the main product, designed for people who never open a terminal. Their
     entry point is a packaged app (double-click; no Python, no flags), which opens the GUI by default —
     so packaging is a required part of the GUI deliverable, not optional.
