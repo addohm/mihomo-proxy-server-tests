@@ -38,13 +38,15 @@ CAUSES = [
     (r"missing port in address|too many colons|invalid (address|port)|unknown network",
      "config error: invalid server address"),
     (r"no such host|lookup .*(fail|refused|timeout)|resolve|dns", "server name doesn't resolve"),
-    (r"network is unreachable|no route to host", "no route to the server (e.g. no IPv6)"),
-    (r"operation not permitted|permission denied", "blocked by a firewall on this computer"),
-    (r"connection refused", "server refused the connection"),
+    # Windows (connectex) says the same in its own words, e.g. "attempted to an unreachable network"
+    (r"network is unreachable|no route to host|unreachable (network|host)", "no route to the server (e.g. no IPv6)"),
+    (r"operation not permitted|permission denied|forbidden by its access permissions",
+     "blocked by a firewall on this computer"),
+    (r"connection refused|actively refused", "server refused the connection"),
     (r"auth|password|unauthori[sz]ed|invalid user|uuid", "server rejected the credentials"),
     (r"tls|x509|certificate", "TLS/certificate problem"),
     (r"i/o timeout|timed out|deadline exceeded|no recent network activity", "connection timed out"),
-    (r"reset by peer|eof|broken pipe|closed", "connection cut (by the server or the network)"),
+    (r"reset by peer|forcibly closed|eof|broken pipe|closed", "connection cut (by the server or the network)"),
 ]
 
 

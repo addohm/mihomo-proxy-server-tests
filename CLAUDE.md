@@ -118,7 +118,10 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    - **Failure cause**: `LogWatcher` streams `/logs?level=warning` in the background for the whole run
      (mihomo streams warnings even at client log level `silent`). A server that isn't ok gets the most
      common `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in
-     `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note.
+     `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note. `CAUSES` has
+     both the Linux/macOS and the English Windows (`connectex` / `wsarecv`) wordings; on a non-English
+     Windows these messages are localised and fall through to "mihomo could not connect through this
+     server" (the direct check still tells what happened).
 6. After **all** transfers (so the test's own traffic doesn't inflate ping or jitter), ping every server
    together (`PING_COUNT` 10, `PING_WORKERS` 50) at the address mihomo **actually dialed** (`remote_ip`:
    `/connections` → `metadata.remoteDestination`, polled during the download; some protocols, e.g.
@@ -243,5 +246,7 @@ user says so.
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.
 - Runs so far: the test server (full runs of all 45 servers on 2026-10-16 before and after step 3, 42 ok
-  both times, restore verified, ~5.5 → ~8 min with the connection probes; the matrix) and short runs on
-  the Windows VM with Clash Verge Rev (see above). No full run on a desktop client yet.
+  both times, restore verified, ~5.5 → ~8 min with the connection probes; the matrix), and the Windows VM
+  with Clash Verge Rev from mainland China: full run of all 43 servers on 2026-10-16 (16.5 min, 25 ok,
+  15 unreachable, 3 failed, restored; the trojan servers on port 43000 answer ping but their port gets no
+  answer, through mihomo and directly: blocked on that network), no "busy" flags, and the short runs above.
