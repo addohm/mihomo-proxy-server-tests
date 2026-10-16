@@ -1,9 +1,10 @@
 # CLAUDE.md
 
 `mihomo_speedtest.py` tests every server in a **running** mihomo, exactly as mihomo uses it, and writes a
-Markdown + CSV report. The launcher only starts `mihomotest/cli.py`; the code lives in the `mihomotest/` package. `context.md` is the original handoff (2026-10-09), kept
-as a frozen snapshot for background; this file is the living summary. Keep this file, README and the
-CLI docstring (`mihomotest/cli.py`, also the `--help` text) in sync when behaviour or options change.
+Markdown + CSV report. The launcher only starts `mihomotest/cli.py`; the code lives in the `mihomotest/`
+package. `context.md` is the original handoff (2026-10-09), kept as a frozen snapshot for background; this
+file is the living summary. Keep this file, README, ROADMAP and the CLI docstring (`mihomotest/cli.py`, also
+the `--help` text) in sync when behaviour or options change.
 
 ## Hard rules
 
@@ -25,17 +26,18 @@ CLI docstring (`mihomotest/cli.py`, also the `--help` text) in sync when behavio
 
 A simple, true test of what mihomo does with each server in its running config. Run → test → table →
 auto-save `.md` + `.csv`. No prompts (the only one allowed: the controller secret when it can't be found).
-Failed servers are simply reported.
+Failed servers are reported, with their cause; they are never skipped.
 
 Explicitly rejected — do not reintroduce:
 - An "isolated" temporary mihomo core built from config files (had to replicate DNS / `nameserver-policy`).
 - Relay / `dialer-proxy` re-tests, binding to the physical interface, auto mode selection, confirmation prompts.
 - Any routing "shenanigans".
+- Skipping transfers for servers that look dead ("if it starts, it starts" — slow starters are flagged instead).
 
 ## Usage
 
 ```bash
-python3 mihomo_speedtest.py                                   # everything, no prompts
+python3 mihomo_speedtest.py                                # everything, no prompts
 python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 ```
 
@@ -49,10 +51,15 @@ Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout 
 mihomo_speedtest.py   launcher: checks Python 3.8+, calls mihomotest.cli.main()
 mihomotest/
   system.py   OS flags, run() (commands without a shell), prereqs() list
-  mihomo.py   Controller (API), find_controller, MihomoState (test mode + restore), servers, DNS, connections
-  tests.py    curl, ping, test_server, run_tests (the run loop) + estimate/counts
+  mihomo.py   Controller (API, incl. streams), find_controller, MihomoState (test mode + restore),
+              list_servers, LogWatcher (mihomo's log), config_servers (address/port from config +
+              provider files), DNS, connections
+  tests.py    curl, ping, tcp_check, test_server, failure cause (dial_error, classify, CAUSES),
+              run_tests (the run loop) + estimate/counts
   report.py   cells/notes formatting, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
+testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server")
+ROADMAP.md    planned work and every decision taken about it
 ```
 
 The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it raises `MihomoError` /
@@ -61,46 +68,50 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
 
 ## How it works
 
-1. `prereqs` / `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional (Windows process
-   discovery only). External commands run directly via `run` (argv list, no shell).
+1. `prereqs` / `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional
+   (Windows process discovery only). External commands run directly via `run` (argv list, no shell).
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
    `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
-   HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time out).
+   HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time
+   out); `Controller.stream` opens long-lived GETs such as `/logs`.
 3. `MihomoState`: records mode, TUN, `GLOBAL` selection (and, as they're touched, every other selector
-   group's selection); turns TUN off, sets mode `global`; opens a temporary
-   `mixed-port` only if there's no local proxy port. `restore()` runs in `finally` (also Ctrl+C,
-   SIGTERM/HUP/BREAK); those signals are ignored while it runs so a second Ctrl+C can't cut it short.
+   group's selection); turns TUN off, sets mode `global`; opens a temporary `mixed-port` only if there's no
+   local proxy port. `restore()` runs in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK) and puts every touched
+   group back (inner groups first, `GLOBAL` last); those signals are ignored while it runs so a second
+   Ctrl+C can't cut it short.
 4. `list_servers`: servers from `/proxies` plus `/providers/proxies` (provider servers are **not** in
    `GLOBAL`'s list). Each gets a `path` of selector groups from `GLOBAL` (e.g. GLOBAL → PROXY → server),
    found by walking selectors from `GLOBAL`; `None` if no selector reaches it (reported as not selectable).
-5. `test_server`, one server at a time: `state.select` walks the server's path (`PUT /proxies/<group>`) → warm-up probes (≤10 s; first connections are
-   slow) → download via curl through mihomo → upload (one retry if warm-up worked). Timed-out transfers
-   (curl rc 28) keep their speed with a "slow: … hit the time limit" note. Time to the first warm-up response
-   is recorded; over `SLOW_START` (3 s) → "slow start: first response after N s"; no warm-up response but the
-   transfers worked → "slow start: no response in the first 10 s". Servers are never skipped.
-   **Failure cause**: `LogWatcher` streams `/logs?level=warning` in the background for the whole run (mihomo
-   streams warnings even at client log level `silent`); a server that isn't ok gets the most common
-   `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in `r["error"]`
-   (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note.
+5. `test_server`, one server at a time: `state.select` walks the server's path (`PUT /proxies/<group>`) →
+   warm-up probes (≤10 s; first connections are slow) → download via curl through mihomo → upload (one
+   retry if warm-up worked). Timed-out transfers (curl rc 28) keep their speed with a "slow: … hit the time
+   limit" note.
+   - **Slow start**: time to the first warm-up response is recorded; over `SLOW_START` (3 s) → "slow start:
+     first response after N s"; no warm-up response but the transfers worked → "slow start: no response in
+     the first 10 s".
+   - **Failure cause**: `LogWatcher` streams `/logs?level=warning` in the background for the whole run
+     (mihomo streams warnings even at client log level `silent`). A server that isn't ok gets the most
+     common `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in
+     `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note.
 6. Ping the IP mihomo **actually dialed** (`remote_ip`: `/connections` → `metadata.remoteDestination`, polled
-   during the download). Servers that never connect fall back to the config's `server` host resolved through
-   mihomo's DNS (`config_hosts` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6 literals is
-   stripped).
-   **Direct TCP check** (failed servers only): plain TCP connect to the dialed/resolved IP and the config's
-   port, outside mihomo (TUN is off) → `open` / `refused` / `no answer` / `no route`; UDP protocols
-   (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the config's `proxies`
-   plus its proxy-provider files (`path`, relative to the config's directory).
-   Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C. macOS: `ping -W` is in ms,
-   IPv6 uses `ping6`.
-   Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
+   during the download). Servers that never connect fall back to the config's `server` host resolved
+   through mihomo's DNS (`config_servers` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6
+   literals is stripped). macOS: `ping -W` is in ms, IPv6 uses `ping6`.
+   - **Direct TCP check** (failed servers only): plain TCP connect to the dialed/resolved IP and the
+     config's port, outside mihomo (TUN is off) → `open` / `refused` / `no answer` / `no route`; UDP
+     protocols (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the
+     config's `proxies` plus its proxy-provider files (`path`, relative to the config's directory).
+   - Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C.
+   - Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
-   Labels stay these four; the cause and the direct check go in the Note (e.g. "connection timed out;
-   direct check: port 43000 no answer"). `UNREACHABLE_NOTE` / `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean
-   the server refused the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
+   Labels stay these four for now (clearer labels are roadmap step 6); the cause and the direct check go in
+   the Note (e.g. "connection timed out; direct check: port 43000 no answer"). `UNREACHABLE_NOTE` /
+   `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean the server refused
+   the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
 8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). The Markdown
-   adds a "Failure details" section with mihomo's raw errors; the CSV adds `first_response_s`, `direct_check`
-   and `mihomo_error` columns. Falls back
-   to cwd, then the temp dir, if `--out` isn't writable. Reports are git-ignored.
+   adds a "Failure details" section with mihomo's raw errors; the CSV adds `first_response_s`,
+   `direct_check` and `mihomo_error` columns. Falls back to cwd, then the temp dir, if `--out` isn't
+   writable. Reports are git-ignored.
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.cloudflare.com/__down` / `__up`.
@@ -113,31 +124,38 @@ Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its 
 options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing).
 
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
-  host key pinned). Fedora 44, x86_64, ~450 MB RAM. Keep the IP out of the repo.
-- **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials.
+  host key pinned). Fedora 44, x86_64, ~450 MB RAM, IPv4 + IPv6 (IPv6 configured by hand with nmcli —
+  DigitalOcean doesn't apply it to existing droplets). Keep the IP out of the repo.
+- **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials. Don't
+  print provider/config files in tool output either.
+- `/etc/mihomo/config.default.yaml` is the default setup (subscription profile with the IPv6 servers'
+  `[…]` brackets removed by hand — a provider-side bug, fix requested). `/etc/mihomo/config.yaml.bak` is the
+  original bracketed profile, handy for reproducing a config error. Re-running `setup.sh` re-downloads the
+  subscription and brings the brackets back until the provider fixes it.
 - To test: copy `mihomo_speedtest.py` and `mihomotest/` to `/root/mst/` with `scp -r` and run it there, as root.
 - **Config variations**: `testserver/variant.py` switches mihomo into a variant built from
-  `/etc/mihomo/config.default.yaml` (controller tcp/unix, secret yes/no, port mixed/socks/http/none, tun
-  off/on, source profile/provider); `testserver/matrix.py` runs the speed test on each variant one change at a
-  time and checks found / tested / restored / exit code, then returns to the default. Copy both to
-  `/root/testserver/`. **Run the matrix before every release and after changes to discovery, state or
-  restore.** It toggles TUN, so start it detached and poll the log:
+  `config.default.yaml` (controller tcp/unix, secret yes/no, port mixed/socks/http/none, tun off/on, source
+  profile/provider); `testserver/matrix.py` runs the speed test on each variant one change at a time and
+  checks found / tested / restored (every selector group) / exit code, then returns to the default. Copy
+  both to `/root/testserver/`. **Run the matrix before every release and after changes to discovery,
+  selection, state or restore.** It toggles TUN, so start it detached and poll the log for
+  "variants passed" (don't `pgrep` for it — the check matches itself):
   `ssh mihomo-testserver 'SSH_IP=${SSH_CLIENT%% *} setsid nohup python3 /root/testserver/matrix.py
   /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'`
-- Simulating failures (used for the diagnosis work): a temporary nftables table on the output hook
-  (`drop` = blocked port, `reject with tcp reset` = refused; UDP drop gives "operation not permitted" locally),
-  and `tc … netem delay` on a `prio` band filtered by destination IP for slow starters. Always delete them
-  afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
+- Simulating failures: a temporary nftables table on the output hook (`drop` = blocked port,
+  `reject with tcp reset` = refused; a local UDP drop shows as "operation not permitted"), and
+  `tc … netem delay` on a `prio bands 4` band filtered by destination IP for slow starters. Always delete
+  them afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
 ## Open items
 
-Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items
-until the user says so.
+Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
+user says so.
 
-
-- First real run on **Windows** (`curl.exe`, named-pipe API, localised `ping` parsing,
-  `Get-CimInstance` discovery) and **macOS** — those paths are written but have never run.
-- A full run with the latest changes (unreachable/failed notes, restore signal handling, direct
-  curl/ping calls) hasn't been done yet.
+- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing, `Get-CimInstance` discovery) have
+  never run. A Windows 11 VM is available for this. **macOS** paths have never run and no Mac is available
+  (GitHub Actions runners are the plan; see ROADMAP).
+- The current code has only run on the test server in short runs (≤ 4 servers, plus the matrix); no full
+  run of every server and no run on a real desktop client since the package split.

@@ -11,8 +11,8 @@ What it does
      server address mihomo actually connected to. For servers that don't work it shows
      why (mihomo's own error, plus a direct check of the server's port) and flags slow
      starters.
-  4. Restores TUN, mode and your selection (also on Ctrl+C), prints the results and saves
-     a Markdown and a CSV report.
+  4. Restores TUN, mode and your server selections (also on Ctrl+C), prints the results
+     and saves a Markdown and a CSV report.
 
 Works on Linux, macOS and Windows. Uses the system's curl and ping.
 While the test runs, traffic that goes through mihomo uses the server under test.

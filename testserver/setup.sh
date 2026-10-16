@@ -2,7 +2,8 @@
 # Set up a Fedora VPS as the remote test server for mihomo_speedtest.py.
 #
 # Installs curl/ping/python3/PyYAML and a plain mihomo core (no GUI client) as a systemd service, with
-# its config built from a subscription URL. Safe to re-run (e.g. with a new subscription URL).
+# its config built from a subscription URL, and saves that config as config.default.yaml (the default
+# setup that variant.py / matrix.py build on). Safe to re-run (e.g. with a new subscription URL).
 #
 #   scp testserver/setup.sh root@HOST:/root/
 #   ssh root@HOST "SUB_URL='https://...' bash /root/setup.sh"
