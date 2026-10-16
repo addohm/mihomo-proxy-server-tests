@@ -113,28 +113,10 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   VPS, as with the test server today. Rejected for now: a second Discord bot (Discord is blocked in
   mainland China and would have to go through the mihomo under test), a job queue on the VPS, Tailscale,
   a GitHub Actions self-hosted runner (GitHub is unreliable from China).
-- Started 2026-10-16: `testserver/setup-windows.ps1` (PowerShell, as a fresh Windows 11 has no Python).
-  Not yet run on any Windows machine. What it does:
-  - installs OpenSSH client + server and Python 3 (winget, all users); sshd listens on 127.0.0.1 only
-    (reached only through the tunnel), keys only, PowerShell as the SSH shell; asks for the public keys
-    allowed to log in; no sleep on mains power;
-  - **turns off VPNs** (user's decision, 2026-10-16): disconnects Windows VPN connections and disables
-    VPN/TUN adapters, so the tunnel goes direct; for a mihomo client's TUN it tells the user to turn TUN
-    off in the client too. This replaces the earlier plan of excluding the VPS address from TUN routing;
-  - makes the PC's own tunnel key, **asks for the server address** (it can change: re-run, enter the new
-    one, Enter for the rest), shows the key plus the command to run on the server, then starts a
-    scheduled task (SYSTEM, at startup) that keeps `ssh -R 127.0.0.1:PORT:127.0.0.1:22` up: keepalives
-    every 15 s notice a dead tunnel within a minute, then it reconnects every 15 s, **indefinitely by
-    default or a chosen number of attempts in a row** (asked at setup; a connection that lasted a minute
-    resets the count; user's request, 2026-10-16); setup checks the tunnel came up and shows
-    `tunnel.log` if not;
-  - server side: `testserver/tunnel-host.sh` (any Linux server; also `TUNNEL_KEY=` in `setup.sh`, so
-    other VPSes can be used); the PC's setup prints the one command to run. A user (`tunnel`) with no
-    shell whose key is limited to `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, an sshd rule
-    allowing it remote forwards only (no `-L` into the server), and `ClientAliveInterval 15` so a dropped
-    tunnel frees its port quickly.
-  - reviewed 2026-10-16 (see CLAUDE.md): key ACL reset for SYSTEM, `known_hosts` re-learned on each run,
-    PyYAML installed. Still to do on the tester PC: Windows auto sign-in and the client's start at login.
+- Tunnel set up 2026-10-16 with a first `testserver/setup-windows.ps1` + `tunnel-host.sh`; the VM's tunnel
+  has worked since. Decided along the way: the PC **turns off VPNs** so the tunnel goes direct (user,
+  replaces excluding the VPS from TUN routing); reconnects **indefinitely by default or N attempts in a
+  row** (user); the server user may only hold its own port (no shell, no `-L` into the server).
 - Windows paths (step 5), done before the VM is reachable (from reading the code, checked on Linux only):
   restore runs before the log stream is closed (closing a pipe can block); busy-pipe retry; closing the
   console window restores like Ctrl+C; output can't crash on characters the console encoding lacks.
@@ -142,37 +124,15 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   ping, reports, restore and the encoding fix all work (details in CLAUDE.md). Still to check: Ctrl+C
   and closing the window (by hand on the desktop), a TCP controller with a secret, TUN on, the PyYAML
   paths, and the matrix (needs a Windows version of `matrix.py`).
-- **Make the tester setup clear for the person doing it** (planned 2026-10-16, after the first VM run,
-  where the user couldn't tell what was going on or what to do; not started). Pain points seen: GitHub's
-  HTML page downloaded instead of the script, the execution-policy error, "paste a public key" without
-  saying whose or why, installer noise (winget/pip errors), "press Enter once done on the server"
-  without saying to switch machines, `tunnel-host.sh` without arguments printing only a usage line, a
-  crash at the end, "Tunnel is up" implying anyone could log in. Decided:
-  - Starting: a double-click `setup-windows.cmd` next to the script (handles admin + execution policy);
-    both still downloaded from GitHub with Raw (no zip).
-  - Windows script: numbered steps ("Step 3 of 7") with one line each on what and why; a clear banner
-    whenever the user must act, saying **where** (this PC / the server) and what, with an example;
-    installer output goes to a log, the screen shows done / warning (what it means) / problem (what to
-    do); every prompt explains itself (whose key, where to find it, Enter to skip); Python 3.13 from
-    python.org (has PyYAML wheels) rather than whatever winget picks.
-  - Server step stays **manual but guided** (user's choice; the PC doesn't log in to the server):
-    banners on both sides, and the PC's key and the exact command also saved to a text file on the
-    Desktop. `tunnel-host.sh` without a key asks for it and says where it comes from; bad input is
-    explained; success ends with "now go back to the PC and press Enter".
-  - End of setup: tests a login through the tunnel, then a plain summary (what runs, who can log in
-    and how, the log, how to change or remove it).
-  - **Re-runs: status + menu** (user's choice): show the current tunnel state, then ask what to change
-    (server address, add a login key, or everything).
-  - README quick start marks where each step happens (PC / server); scripts are checked on the VM
-    (`ssh mihomo-winvm`) before they're handed over.
-  - **Generic and repeatable** (user, 2026-10-16): the tunnel tooling becomes its own project (a
-    separate repo, e.g. `revtunnel`), usable for any reverse tunnel; this repo keeps only a mihomo-tester
-    preset and a pointer. Decided: PC side for **Windows and Linux** (scheduled task / systemd service;
-    macOS later); the tunnel leads to **any port** on the PC (default 22, which installs the PC's SSH
-    server; e.g. RDP 3389 or a web UI otherwise); named tunnels (folder, task/service and log per name;
-    several per PC); optional extras chosen at setup (keep awake, VPNs off, install Python), all on in
-    the mihomo-tester preset; every answer also as a parameter, so a PC can be set up from a script.
-    Server side: `tunnel-host.sh` without mihomo names, plus `--list` and `--remove PORT`.
+- **Tester setup made clear and generic: done 2026-10-16, as its own project, revtunnel**
+  (`addohm/revtunnel`). After the first VM run, where the user couldn't tell what was going on or what to
+  do, the user asked for guided steps that say what, why and **where** (PC / server), and for a tool that
+  works for any reverse tunnel. Decided with the user: the server step stays manual but guided (banner,
+  one-line command, also saved to a Desktop file; the server script asks for the key if missing); re-runs
+  show the status and a menu; a double-click `.cmd`, downloaded from GitHub with Raw; Windows and Linux
+  PCs; any port on the PC; named tunnels; every answer also an option. This repo keeps only the preset
+  `testserver/tester-windows.cmd` (keep awake, VPNs off, Python 3.13 with PyYAML). Pending: move the VM
+  to the preset (see CLAUDE.md).
 - Still open:
   - Tests still run detached and are polled from a log, as with the matrix.
   - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.

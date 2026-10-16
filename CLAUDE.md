@@ -63,8 +63,8 @@ mihomotest/
   report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
-              setup-windows.ps1 (Windows tester behind a reverse SSH tunnel, roadmap step 4),
-              tunnel-host.sh (any Linux server's side of that tunnel); README.md (workflow and usage of all of these)
+              tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
+              README.md (workflow and usage of all of these)
 ROADMAP.md    planned work and every decision taken about it
 ```
 
@@ -154,7 +154,7 @@ A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`,
 controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
 Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
 options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing; `TUNNEL_KEY=…`
-also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to it).
+also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied next to it).
 
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
   host key pinned). Fedora 44, x86_64, ~450 MB RAM, IPv4 + IPv6 (IPv6 configured by hand with nmcli —
@@ -179,33 +179,22 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
   `reject with tcp reset` = refused; a local UDP drop shows as "operation not permitted"), and
   `tc … netem delay` on a `prio bands 4` band filtered by destination IP for slow starters. Always delete
   them afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
-- **Windows tester** (roadmap step 4): `testserver/setup-windows.ps1` sets up a fresh Windows 11 PC (OpenSSH
-  server on 127.0.0.1, Python, VPNs off) and keeps a reverse tunnel to a server; reach it from that server
-  with `ssh -p PORT WINUSER@127.0.0.1`. The tunnel (SYSTEM scheduled task, `ssh -R` with 15 s keepalives)
-  reconnects every 15 s, indefinitely by default or N attempts in a row (asked at setup; a connection
-  that lasted a minute resets the count). Usage: `testserver/README.md` (workflow) and the script's header. Keep it ASCII-only (Windows
-  PowerShell 5.1 reads BOM-less files as ANSI). First run on the VM 2026-10-16: tunnel works.
-  - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
-    mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
-    `tunnel`: no shell, no password; key limited to `permitlisten="127.0.0.1:PORT"`; an sshd `Match User`
-    drop-in per user (`/etc/ssh/sshd_config.d/41-mihomo-tunnel-USER.conf`; keepalives in
-    `40-mihomo-tunnel.conf`) allows it remote forwards only — the key
-    option `port-forwarding` alone also allowed `-L` into the server (e.g. mihomo's unauthenticated proxy
-    port). Verified on the test server: own port works; other ports, 0.0.0.0, `-L` and shell refused; root's
-    sshd settings unchanged. The test server has the user (no keys yet). VM port: 2222.
-  - PC side, checked by review (2026-10-16; parsed with PowerShell 7, tunnel `ssh` options run against
-    the test server, not yet run on Windows): the tunnel key's owner is set to Administrators and its ACL
-    reset to SYSTEM + Administrators (ssh.exe as SYSTEM refuses a key owned or readable by the setup user —
-    seen on the VM: auth never offered the key); ssh's log goes through `cmd /c … 2>>` (`ssh -E` locks
-    the file, so setup couldn't read it); PyYAML from wheels only (none yet for a brand-new Python); `known_hosts` is cleared on each run
-    so a rebuilt server is trusted again; PyYAML is installed. For unattended use the PC also needs
-    Windows auto sign-in and the client set to start at login (the tunnel task starts at boot, the
-    client only at logon). Turning TUN off in the client before setup matters: the script disables
-    adapters named Mihomo/Meta, which could get in the way when the client turns TUN on again.
-  - The VM (in mainland China, Windows 11, user `addohm`, Python 3.15 without PyYAML) is reachable:
-    `ssh mihomo-winvm` (in `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump
-    mihomo-testserver`). Tunnel up since 2026-10-16 after the key-owner fix. Its mihomo client's TUN
-    adapter (`Meta`) was disabled by setup.
+- **Windows tester** (roadmap step 4): the reverse-tunnel tooling is its own project, **revtunnel**
+  (`addohm/revtunnel`, workspace `/srv/claude/workspaces/revtunnel`; generic: Windows + Linux PCs, any
+  port, named tunnels, guided steps, status + re-run menu). This repo keeps only the preset
+  `testserver/tester-windows.cmd` (runs `revtunnel-windows.ps1` next to it with `-Name mihomo-tester
+  -KeepAwake -NoVpn -Python 3.13 -PythonPackages pyyaml`) and the workflow in `testserver/README.md`.
+  Server side: `revtunnel-server.sh KEY PORT` on the test server (user `tunnel`, sshd drop-ins
+  `40-revtunnel.conf` / `41-revtunnel-tunnel.conf`; `--list` shows every PC and whether it's connected).
+  - The VM (in mainland China, Windows 11, user `addohm`) is reachable: `ssh mihomo-winvm` (in
+    `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump mihomo-testserver`). It still
+    runs the **pre-revtunnel** tunnel (task "mihomo-tester tunnel", `C:\ProgramData\mihomo-tester`,
+    Python 3.15 without PyYAML); moving it to the preset is pending (it cuts the SSH session the other
+    VM work uses, so coordinate first: set up the preset on port 2223, check a login there, then remove
+    the old task and switch `mihomo-winvm` to 2223). Its mihomo client's TUN adapter (`Meta`) was
+    disabled by the first setup.
+  - For unattended use the PC also needs Windows auto sign-in and the client set to start at login (the
+    tunnel starts at boot, the client only at logon).
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
