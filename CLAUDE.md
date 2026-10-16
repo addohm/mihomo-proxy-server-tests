@@ -155,13 +155,13 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probe
 
 ## Remote test server
 
-> **2026-10-16: the Fedora test server below is deleted** (user). Its IP may now belong to someone else:
-> don't connect to `mihomo-testserver` (or `mihomo-winvm`, which jumped through it). Replacement so far: an
-> Ubuntu 24.04 VPS in Singapore, `/claude ssh` host `sgp-vps` (run
-> `/srv/claude/data/ssh/mihomo-proxy-server-tests/ssh sgp-vps '...'`), **without mihomo yet**, which holds
-> the tunnel of a Windows 11 VM in mainland China (`DESKTOP-BJUBIRD`, user `addohm`, revtunnel tunnel
-> `main` on port 2222: from the VPS `ssh -p 2222 addohm@127.0.0.1`). The notes below describe the old
-> setup until the new one is decided.
+> **2026-10-16: the Fedora test server below is deleted** (user); don't connect to its old address (the
+> `mihomo-testserver` alias is removed). Now: an Ubuntu 24.04 VPS in Singapore, `/claude ssh` host
+> `sgp-vps` (`/srv/claude/data/ssh/mihomo-proxy-server-tests/ssh sgp-vps '...'`), **without mihomo yet**,
+> holding the revtunnel tunnel (`main`, port 2222) of a **freshly installed** Windows 11 VM in mainland
+> China (`DESKTOP-BJUBIRD`, user `addohm`, Python 3.13.16; no mihomo client yet). `ssh mihomo-winvm` now
+> reaches that VM (ProxyCommand through `sgp-vps`, the workspace's `/claude ssh` key, which is the VM's
+> only login key). The notes below describe the old setup until the new one is decided.
 
 A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`, config `/etc/mihomo/`,
 controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
