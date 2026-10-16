@@ -64,7 +64,7 @@ mihomotest/
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
               setup-windows.ps1 (Windows tester behind a reverse SSH tunnel, roadmap step 4),
-              tunnel-host.sh (any Linux server's side of that tunnel)
+              tunnel-host.sh (any Linux server's side of that tunnel); README.md (workflow and usage of all of these)
 ROADMAP.md    planned work and every decision taken about it
 ```
 
@@ -183,7 +183,7 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
   server on 127.0.0.1, Python, VPNs off) and keeps a reverse tunnel to a server; reach it from that server
   with `ssh -p PORT WINUSER@127.0.0.1`. The tunnel (SYSTEM scheduled task, `ssh -R` with 15 s keepalives)
   reconnects every 15 s, indefinitely by default or N attempts in a row (asked at setup; a connection
-  that lasted a minute resets the count). Usage: the script's header and output. Keep it ASCII-only (Windows
+  that lasted a minute resets the count). Usage: `testserver/README.md` (workflow) and the script's header. Keep it ASCII-only (Windows
   PowerShell 5.1 reads BOM-less files as ANSI). Not yet run on Windows.
   - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
     mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
