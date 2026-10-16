@@ -5,8 +5,9 @@ connection time and download/upload speed through mihomo, and ping to the addres
 with its jitter. For servers that don't work it shows why: mihomo's own error (e.g. "connection timed out",
 "config error") plus a direct check of the server's port (blocked, refused, or reachable). It also flags
 servers that are slow to start, tests disturbed by other apps' traffic, and servers behind Cloudflare's CDN
-(whose ping shows the CDN, not the server). Works with any mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with
-servers listed in the config or loaded from proxy providers.
+(whose ping shows the CDN, not the server). Works with any mihomo-based client (Clash Verge Rev, Mihomo
+Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with servers listed in the config or loaded from
+proxy providers.
 
 ```bash
 python3 mihomo_speedtest.py                      # test everything
@@ -14,9 +15,11 @@ python3 mihomo_speedtest.py --filter "Japan"     # only matching servers
 python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fast servers/connections
 ```
 
+On Windows, use `py` instead of `python3` (e.g. `py mihomo_speedtest.py`).
+
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
-(also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved next to the script as
-`mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
+(also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved next to the script
+as `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
 
 ## Reading the results
 
@@ -68,7 +71,8 @@ Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all op
 
 Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script runs the code in that folder.
 
-Status: in use on Linux. Windows: first runs with Clash Verge Rev work; more configurations still to be
-tested. macOS support is written but not yet tested.
+Status: in use on Linux. Windows: tested with Clash Verge Rev (named pipe, TUN on or off, different
+proxy ports, with or without PyYAML); other Windows clients not yet. macOS support is written but not yet
+tested.
 
 Planned features: see [ROADMAP.md](ROADMAP.md).

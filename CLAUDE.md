@@ -9,11 +9,11 @@ roadmap step done) also read all of them end to end and fix anything stale (user
 
 ## Hard rules
 
-- **Never run or test the script locally, on any machine (not even in the background), unless the user
-  explicitly says to.** It turns TUN off and switches mode/selection on a live client. By default, give the
-  exact command; the user runs it and reports back.
-- When the user does ask for a test, run it **only on the remote test server over SSH** — never locally.
-  See "Remote test server" below.
+- **Never run or test the script locally, or on any machine the user actually uses, unless the user
+  explicitly says to.** It turns TUN off and switches mode/selection on a live client.
+- Test it **yourself, on the test machines over SSH**: the Linux test server and the Windows tester PC
+  (through the tunnel). Don't ask the user to run things there (user, 2026-10-16). See "Remote test
+  server" below.
 - Static checks are fine: `python3 -m py_compile mihomo_speedtest.py mihomotest/*.py`, and importing the
   package (it has no side effects on import).
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
@@ -204,6 +204,11 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied 
     the window: `testserver/win_interrupt.py` (starts the test in its own console, interrupts it, checks
     the restore). Processes started from an SSH session inherit "ignore Ctrl+C", so a plain
     `Start-Process` never sees a Ctrl+C. Put back any selection you change for a test.
+  - Anything that may cut the tunnel (TUN on/off, long runs): start it detached with `Invoke-CimMethod
+    Win32_Process -MethodName Create` (processes started normally die with the SSH session) and have it
+    write a log with `Out-File -Encoding utf8`: Windows PowerShell's `>>` / `*>>` write UTF-16, which a
+    plain `grep` on the fetched text never matches. Check the waiting condition on a finished log before
+    relying on it, and report as soon as the run ends.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
@@ -226,10 +231,13 @@ user says so.
   default and secret also with 3.15 without PyYAML. Findings: mihomo doesn't check the secret on a named
   pipe (right, none or wrong all get 200), so on Windows the secret only matters for a TCP controller; and
   mihomo opens a TCP controller only at start-up, not when a config is loaded through the API (so the
-  Windows matrix can't cover it; the code is OS-independent and `matrix.py` covers it on Linux). Not yet
-  checked on Windows: TUN on at rest (it also carries the tunnel), and the PyYAML path for failed servers
-  (ping / direct check from the config's address; the check was cut off). **macOS** paths have never run
-  and no Mac is available (GitHub Actions runners are the plan; see ROADMAP).
+  Windows matrix can't cover it; the code is OS-independent and `matrix.py` covers it on Linux). TUN on at
+  rest (Verge's `Meta` adapter up, the tunnel itself through TUN): TUN off for the test and back on
+  after, everything restored, the tunnel reconnected by itself. PyYAML path with Python 3.13: a failed
+  server gets its ping and direct check from the config's address (→ "unreachable"). Not covered: other
+  Windows clients (Mihomo Party, Nyanpasu, FlClash) and a non-English Windows (ping parsing only checked
+  offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
+  see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.
 - Runs so far: the test server (full runs of all 45 servers on 2026-10-16 before and after step 3, 42 ok

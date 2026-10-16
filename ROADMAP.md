@@ -10,7 +10,7 @@ nothing here is started until the user says so. Done items are removed (see git 
 3. ~~Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic
    flag, CDN labels, table layout rework~~ — done
 4. Remote tester inside China (reverse SSH tunnel; see the section below)
-5. Windows paths: test and fix on the China tester / the Windows 11 VM
+5. ~~Windows paths: test and fix on the China tester / the Windows 11 VM~~ — done 2026-10-16 (Clash Verge Rev)
 6. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
 7. Per-user reports folder + baseline / `--compare`
 8. Clearer result labels
@@ -100,7 +100,8 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
 - No Mac is available. macOS (and Windows) can be covered by GitHub Actions runners: a job that starts a
   second local mihomo as a stand-in "server" (no subscription needed) and runs the script's real platform
   paths (discovery, named pipe, ping parsing, curl, restore).
-- A Windows 11 VM is available (2026-10-15) for testing the Windows paths by hand.
+- A Windows 11 VM (in mainland China, reached through the reverse tunnel) is the Windows tester; see
+  "4–5" below and `testserver/README.md`.
 
 ## 4–5. Remote tester inside China, Windows paths (added 2026-10-16)
 
@@ -123,9 +124,11 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   First runs on the VM (2026-10-16): discovery over Clash Verge Rev's pipe, API, log stream, `curl.exe`,
   ping, reports, restore and the encoding fix all work (details in CLAUDE.md). Ctrl+C and closing the
   window restore everything (`testserver/win_interrupt.py`). The Windows matrix
-  (`testserver/win_matrix.py`) passes 6 of 6. Still to check: TUN on at rest, and the PyYAML path for
-  failed servers. A TCP controller can't be switched on through the API (only at start-up); it's
-  covered by the Linux matrix.
+  (`testserver/win_matrix.py`) passes 6 of 6; TUN on at rest and the PyYAML path for failed servers pass
+  too. A TCP controller can't be switched on through the API (only at start-up); it's covered by the
+  Linux matrix. **Step 5 done 2026-10-16** for Clash Verge Rev; other Windows clients (Mihomo Party,
+  Nyanpasu, FlClash) and a non-English Windows haven't run (ping parsing checked offline for zh / de /
+  ja).
 - **Tester setup made clear and generic: done 2026-10-16, as its own project, revtunnel**
   (`addohm/revtunnel`). After the first VM run, where the user couldn't tell what was going on or what to
   do, the user asked for guided steps that say what, why and **where** (PC / server), and for a tool that
