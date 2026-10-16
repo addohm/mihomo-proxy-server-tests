@@ -5,7 +5,7 @@
 # its config built from a subscription URL, and saves that config as config.default.yaml (the default
 # setup that variant.py / matrix.py build on). Safe to re-run (e.g. with a new subscription URL).
 #
-#   scp testserver/setup.sh root@HOST:/root/
+#   scp testserver/setup.sh testserver/tunnel-host.sh root@HOST:/root/
 #   ssh root@HOST "SUB_URL='https://...' bash /root/setup.sh"
 #
 # Settings (environment variables):
@@ -15,6 +15,10 @@
 #                   The SSH client's IP is excluded from TUN routing so the session survives. Default 0.
 #   SUB_UA          User-Agent for fetching the subscription (default looks like a mihomo client, so
 #                   providers return a full mihomo profile)
+#   TUNNEL_KEY      optional: a tester PC's public key (shown by setup-windows.ps1); also prepares this
+#                   server for that PC's reverse SSH tunnel via tunnel-host.sh, which must be copied next
+#                   to this script. TUNNEL_PORT: its port here (default 2222). Without mihomo, run
+#                   tunnel-host.sh on its own.
 #
 # Everything listens on 127.0.0.1 only: controller 127.0.0.1:9090 (random secret), mixed-port 7890.
 set -euo pipefail
@@ -23,8 +27,11 @@ SUB_URL="${SUB_URL:?set SUB_URL to the subscription URL}"
 MIHOMO_VERSION="${MIHOMO_VERSION:-latest}"
 TUN="${TUN:-0}"
 DIR=/etc/mihomo
+TUNNEL_KEY="${TUNNEL_KEY:-}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
+[ -z "$TUNNEL_KEY" ] || [ -f "$HERE/tunnel-host.sh" ] || { echo "TUNNEL_KEY needs tunnel-host.sh next to this script." >&2; exit 1; }
 grep -qi fedora /etc/os-release || echo "Warning: not Fedora; continuing anyway." >&2
 
 echo "==> Packages"
@@ -136,6 +143,11 @@ p = json.load(sys.stdin)["proxies"]
 n = sum(str(v.get("type", "")).lower() not in groups for v in p.values())
 print(f"   mihomo is up: {n} servers")' \
     || { echo "mihomo did not come up. Logs:" >&2; journalctl -u mihomo -n 30 --no-pager >&2; exit 1; }
+
+if [ -n "$TUNNEL_KEY" ]; then
+    echo "==> Tester tunnel"
+    bash "$HERE/tunnel-host.sh" "$TUNNEL_KEY" "${TUNNEL_PORT:-2222}"
+fi
 
 echo
 echo "Done. Controller 127.0.0.1:9090, secret in $DIR/config.yaml, TUN $([ "$TUN" = 1 ] && echo on || echo off)."

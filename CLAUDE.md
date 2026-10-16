@@ -63,7 +63,8 @@ mihomotest/
   report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
-              setup-windows.ps1 (Windows tester behind a reverse SSH tunnel, roadmap step 4)
+              setup-windows.ps1 (Windows tester behind a reverse SSH tunnel, roadmap step 4),
+              tunnel-host.sh (any Linux server's side of that tunnel)
 ROADMAP.md    planned work and every decision taken about it
 ```
 
@@ -152,7 +153,8 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probe
 A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`, config `/etc/mihomo/`,
 controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
 Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
-options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing).
+options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing; `TUNNEL_KEY=…`
+also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to it).
 
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
   host key pinned). Fedora 44, x86_64, ~450 MB RAM, IPv4 + IPv6 (IPv6 configured by hand with nmcli —
@@ -179,8 +181,17 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
   them afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
 - **Windows tester** (roadmap step 4): `testserver/setup-windows.ps1` sets up a fresh Windows 11 PC (OpenSSH
   server on 127.0.0.1, Python, VPNs off) and keeps a reverse tunnel to a server; reach it from that server
-  with `ssh -p PORT WINUSER@127.0.0.1`. Usage and the server-side commands: the script's header and
-  output. Keep it ASCII-only (Windows PowerShell 5.1 reads BOM-less files as ANSI). Not yet run anywhere.
+  with `ssh -p PORT WINUSER@127.0.0.1`. Usage: the script's header and output. Keep it ASCII-only (Windows
+  PowerShell 5.1 reads BOM-less files as ANSI). Not yet run on Windows.
+  - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
+    mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
+    `tunnel`: no shell, no password; key limited to `permitlisten="127.0.0.1:PORT"`; an sshd `Match User`
+    drop-in (`/etc/ssh/sshd_config.d/40-mihomo-tunnel.conf`) allows it remote forwards only — the key
+    option `port-forwarding` alone also allowed `-L` into the server (e.g. mihomo's unauthenticated proxy
+    port). Verified on the test server: own port works; other ports, 0.0.0.0, `-L` and shell refused; root's
+    sshd settings unchanged. The test server has the user (no keys yet). VM port: 2222.
+  - Claude's login key for the VM: `~/.ssh/mihomo-winvm` (to add as `mihomo-winvm` in `~/.ssh/config`,
+    `ProxyJump mihomo-testserver`, once the tunnel is up).
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 

@@ -128,8 +128,10 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
     default or a chosen number of attempts in a row** (asked at setup; a connection that lasted a minute
     resets the count; user's request, 2026-10-16); setup checks the tunnel came up and shows
     `tunnel.log` if not;
-  - server side (printed commands): a user (`tunnel`) with no shell whose key is limited to
-    `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, and `ClientAliveInterval 15` so a dropped
+  - server side: `testserver/tunnel-host.sh` (any Linux server; also `TUNNEL_KEY=` in `setup.sh`, so
+    other VPSes can be used); the PC's setup prints the one command to run. A user (`tunnel`) with no
+    shell whose key is limited to `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, an sshd rule
+    allowing it remote forwards only (no `-L` into the server), and `ClientAliveInterval 15` so a dropped
     tunnel frees its port quickly.
 - Windows paths (step 5), done before the VM is reachable (from reading the code, checked on Linux only):
   restore runs before the log stream is closed (closing a pipe can block); busy-pipe retry; closing the

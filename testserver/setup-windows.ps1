@@ -10,10 +10,11 @@ It asks for administrator rights, then:
   3. keeps the PC awake on mains power
   4. looks for VPN connections and VPN/TUN adapters and turns them off, so the tunnel goes direct
   5. makes this PC's own tunnel key and asks for the server's address
-  6. shows the key and the commands to run on the server, then starts the tunnel: a scheduled task (as
-     SYSTEM, at startup) keeps "ssh -R 127.0.0.1:PORT:127.0.0.1:22" up. Keepalives every 15 s notice a
-     dead tunnel within a minute; it then reconnects every 15 s, either indefinitely (the default) or a
-     set number of times in a row before giving up until the next restart or re-run
+  6. shows the key and the command to run on the server (testserver/tunnel-host.sh), then starts the
+     tunnel: a scheduled task (as SYSTEM, at startup) keeps "ssh -R 127.0.0.1:PORT:127.0.0.1:22" up.
+     Keepalives every 15 s notice a dead tunnel within a minute; it then reconnects every 15 s, either
+     indefinitely (the default) or a set number of times in a row before giving up until the next
+     restart or re-run
 
 Safe to re-run; previous answers are the defaults. The server address can change: re-run, enter the new
 address, press Enter for the rest. Files: C:\ProgramData\mihomo-tester (key, settings, tunnel.log).
@@ -147,24 +148,15 @@ $c | Add-Member -Force Retries ([int](Ask 'Reconnect attempts before giving up (
 $c | ConvertTo-Json | Set-Content -Path $Conf -Encoding ascii
 
 $pub = (Get-Content "$Key.pub" -Raw).Trim()
-$blob = $pub.Split(' ')[1]
-$line = "restrict,port-forwarding,permitlisten=`"127.0.0.1:$($c.RemotePort)`" $pub"
-$u = $c.User
 Write-Host ''
 Write-Host "This PC's public key:" -ForegroundColor Cyan
 Write-Host $pub
 Write-Host ''
-Write-Host "On the server, as root (adds user '$u', which may only hold this port forward; safe to re-run):" -ForegroundColor Cyan
-Write-Host @"
-id $u >/dev/null 2>&1 || useradd --create-home --shell /usr/sbin/nologin $u
-usermod -p '*' $u
-f=~$u/.ssh/authorized_keys; mkdir -p ~$u/.ssh; touch `$f
-{ grep -vF '$blob' `$f; echo '$line'; } > `$f.new && mv `$f.new `$f
-chown -R ${u}: ~$u/.ssh && chmod 700 ~$u/.ssh && chmod 600 `$f
-restorecon -R ~$u/.ssh 2>/dev/null || true
-printf 'ClientAliveInterval 15\nClientAliveCountMax 4\n' > /etc/ssh/sshd_config.d/40-mihomo-tunnel.conf
-sshd -t && { systemctl reload sshd || systemctl reload ssh; }
-"@
+Write-Host "On the server, as root, with tunnel-host.sh from the project's testserver folder (adds user" -ForegroundColor Cyan
+Write-Host "'$($c.User)', which may only hold this port forward; safe to re-run):" -ForegroundColor Cyan
+Write-Host "bash tunnel-host.sh '$pub' $($c.RemotePort) $($c.User)"
+Write-Host ''
+Write-Host "Windows user name for logging in through the tunnel: $env:USERNAME"
 Write-Host ''
 Read-Host 'Press Enter once that is done on the server' | Out-Null
 
