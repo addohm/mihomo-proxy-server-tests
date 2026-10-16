@@ -239,8 +239,16 @@ user says so.
   Windows matrix can't cover it; the code is OS-independent and `matrix.py` covers it on Linux). TUN on at
   rest (Verge's `Meta` adapter up, the tunnel itself through TUN): TUN off for the test and back on
   after, everything restored, the tunnel reconnected by itself. PyYAML path with Python 3.13: a failed
-  server gets its ping and direct check from the config's address (→ "unreachable"). Not covered: other
-  Windows clients (Mihomo Party, Nyanpasu, FlClash) and a non-English Windows (ping parsing only checked
+  server gets its ping and direct check from the config's address (→ "unreachable"). **Clash Party** (formerly
+  Mihomo Party, 2.0.3; core `mihomo.exe` as a normal process in the user's session, no `-f`, only `-d
+  …\mihomo-party\work`, pipe `\\.\pipe\MihomoParty\mihomo-user-<user>-<n>`, mixed 7890 + socks 7891 +
+  http 7892): found on its own, win_matrix 6/6, Ctrl+C and close PASS. With two clients running the first
+  core in the process list is tested (the output names its pipe; `--api` picks another). Installing a
+  client for a test: `winget` over SSH works; start GUI apps in the user's session with a scheduled task
+  (`LogonType Interactive`); Clash Party ignored a `clash://install-config` link passed on its command
+  line, so its profile was written directly (`profile.yaml` + `profiles\<id>.yaml`, content copied from
+  Verge's). Clash Verge Rev's service is `clash_verge_service`. Not covered: other Windows clients
+  (Nyanpasu, FlClash) and a non-English Windows (ping parsing only checked
   offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
   see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are

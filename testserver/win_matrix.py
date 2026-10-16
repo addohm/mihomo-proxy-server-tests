@@ -3,7 +3,7 @@
     py -3.13 win_matrix.py C:\\path\\to\\mihomo_speedtest.py [--python PY.EXE] [--filter REGEX] [--only NAME ...]
 
 The Windows counterpart of matrix.py. The client (e.g. Clash Verge Rev) keeps running: each variant is a
-copy of the core's own config (its -f file) with one change, written next to it and loaded through the API
+copy of the core's own config (its -f file, or config.yaml in its -d home) with one change, written next to it and loaded through the API
 (PUT /configs); the original file is loaded back at the end, also after an error or Ctrl+C. The client's own
 settings are never touched. Variants:
     default      the config as the client wrote it (controller over its named pipe)
@@ -46,10 +46,12 @@ class Core:
               "-match 'mihomo' } | ForEach-Object { $_.CommandLine }"]
         cmd = subprocess.run(ps, capture_output=True, text=True).stdout
         arg = lambda flag: (re.search(rf"{flag}\s+(\"[^\"]+\"|\S+)", cmd) or [None, None])[1]
-        self.pipe, self.config, self.home = arg("-ext-ctl-pipe"), arg("-f"), arg("-d")
-        if not (self.pipe and self.config and self.home):
-            sys.exit(f"no mihomo with -ext-ctl-pipe, -f and -d found:\n{cmd}")
-        self.config, self.home = self.config.strip('"'), self.home.strip('"')
+        self.pipe, self.home = arg("-ext-ctl-pipe"), arg("-d")
+        if not (self.pipe and self.home):
+            sys.exit(f"no mihomo with -ext-ctl-pipe and -d found:\n{cmd}")
+        self.home = self.home.strip('"')
+        # without -f mihomo reads config.yaml in its home directory (e.g. Clash Party)
+        self.config = (arg("-f") or os.path.join(self.home, "config.yaml")).strip('"')
         self.original = yaml.safe_load(open(self.config, encoding="utf-8"))
         self.secret = str(self.original.get("secret") or "")
 

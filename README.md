@@ -21,6 +21,9 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 (also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved next to the script
 as `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
 
+If more than one mihomo client is running, the first one found is tested; the line "Connected to mihomo …
+at …" says which. Use `--api` to choose another (e.g. its pipe, `--api \\.\pipe\NAME`).
+
 ## Reading the results
 
 - **Conn ms**: time until the first response over a new connection through the server (median of 5). This

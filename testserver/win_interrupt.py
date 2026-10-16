@@ -44,6 +44,7 @@ def send(pid, what):
 
 
 def main():
+    sys.stdout.reconfigure(errors="replace")  # over SSH the console encoding may lack the test's characters
     if sys.argv[1] == "--send":
         return send(int(sys.argv[2]), sys.argv[3])
     mst, what = os.path.abspath(sys.argv[1]), sys.argv[2]
