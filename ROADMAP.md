@@ -141,6 +141,29 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   check on Windows: all of these, discovery (PowerShell, `%APPDATA%`, default pipes) with Clash Verge Rev
   over its pipe and over TCP, localised ping, `curl.exe` revocation checks, and the matrix (needs a
   Windows version of `matrix.py`).
+- **Make the tester setup clear for the person doing it** (planned 2026-10-16, after the first VM run,
+  where the user couldn't tell what was going on or what to do; not started). Pain points seen: GitHub's
+  HTML page downloaded instead of the script, the execution-policy error, "paste a public key" without
+  saying whose or why, installer noise (winget/pip errors), "press Enter once done on the server"
+  without saying to switch machines, `tunnel-host.sh` without arguments printing only a usage line, a
+  crash at the end, "Tunnel is up" implying anyone could log in. Decided:
+  - Starting: a double-click `setup-windows.cmd` next to the script (handles admin + execution policy);
+    both still downloaded from GitHub with Raw (no zip).
+  - Windows script: numbered steps ("Step 3 of 7") with one line each on what and why; a clear banner
+    whenever the user must act, saying **where** (this PC / the server) and what, with an example;
+    installer output goes to a log, the screen shows done / warning (what it means) / problem (what to
+    do); every prompt explains itself (whose key, where to find it, Enter to skip); Python 3.13 from
+    python.org (has PyYAML wheels) rather than whatever winget picks.
+  - Server step stays **manual but guided** (user's choice; the PC doesn't log in to the server):
+    banners on both sides, and the PC's key and the exact command also saved to a text file on the
+    Desktop. `tunnel-host.sh` without a key asks for it and says where it comes from; bad input is
+    explained; success ends with "now go back to the PC and press Enter".
+  - End of setup: tests a login through the tunnel, then a plain summary (what runs, who can log in
+    and how, the log, how to change or remove it).
+  - **Re-runs: status + menu** (user's choice): show the current tunnel state, then ask what to change
+    (server address, add a login key, or everything).
+  - README quick start marks where each step happens (PC / server); scripts are checked on the VM
+    (`ssh mihomo-winvm`) before they're handed over.
 - Still open:
   - Tests still run detached and are polled from a log, as with the matrix.
   - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.
