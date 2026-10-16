@@ -7,11 +7,15 @@ What it does
   1. Finds your running mihomo (any client: Clash Verge Rev, Mihomo Party, Nyanpasu,
      FlClash, ClashX Meta, plain mihomo...) through its external-controller API.
   2. Temporarily turns TUN off and switches mihomo to global mode.
-  3. For each server: selects it, downloads and uploads through mihomo, and pings the
-     server address mihomo actually connected to. For servers that don't work it shows
-     why (mihomo's own error, plus a direct check of the server's port) and flags slow
-     starters.
-  4. Restores TUN, mode and your server selections (also on Ctrl+C), prints the results
+  3. For each server: selects it, times 5 new connections through it (Conn ms), then
+     downloads and uploads through mihomo (speeds count the transfer itself, not the
+     connection setup). For servers that don't work it shows why (mihomo's own error,
+     plus a direct check of the server's port); it also flags slow starters and other
+     apps' traffic that shared the server during its test.
+  4. After all transfers, pings every server address mihomo actually connected to
+     (10 pings each). Servers behind Cloudflare's CDN are labelled: their ping shows
+     the CDN edge, not the server.
+  5. Restores TUN, mode and your server selections (also on Ctrl+C), prints the results
      and saves a Markdown and a CSV report.
 
 Works on Linux, macOS and Windows. Uses the system's curl and ping.
@@ -33,11 +37,12 @@ import re
 import shutil
 import signal
 import sys
+import textwrap
 import time
 import unicodedata
 
 from .mihomo import STOP_SIGNALS, MihomoError, SecretNeeded, find_controller, list_servers
-from .report import HEADERS, cells, mmss, notes, save_reports
+from .report import HEADERS, LEGEND, cells, mmss, notes, save_reports
 from .system import IS_WIN, prereqs
 from .tests import counts, run_tests
 
@@ -45,7 +50,7 @@ if IS_WIN:
     os.system("")  # enable ANSI colours in Windows terminals
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # where mihomo_speedtest.py lives
-WIDTHS = [(3, True), (34, False), (10, False), (8, True), (7, True), (10, True), (8, True), (11, False)]
+WIDTHS = [(3, True), (28, False), (9, False), (10, True), (10, True), (6, True), (9, True), (8, True), (11, False)]
 NOT_FOUND = ("\n  • Make sure your client (or mihomo) is running."
              "\n  • Enable its external controller, or pass --api ADDRESS (and --secret)."
              "\n    Examples: --api 127.0.0.1:9090   --api unix:/tmp/mihomo.sock   --api \\\\.\\pipe\\mihomo")
@@ -144,8 +149,12 @@ def on_event(kind, data):
                   "global mode;\nyour settings are restored at the end (also on Ctrl+C)."))
     elif kind == "server":
         status_line(f"[{data['index']}/{data['total']}] {data['server']['name']}   ~{mmss(data['left'])} left")
+    elif kind == "busy":
+        print(warn(f"Other apps are sending ~{data['rate'] / 1e6:.1f} MB/s through mihomo right now; during the "
+                   "test that traffic uses the server under test,\nso speeds may read low. Servers affected "
+                   "are marked 'busy' in the Note."))
     elif kind == "pinging":
-        status_line("Finishing pings...")
+        status_line(f"Pinging {data['count']} servers...")
     elif kind == "stopped":
         clear_status()
         print(warn("\nStopped - showing the servers tested so far."))
@@ -210,6 +219,7 @@ def main():
     print(f"\n{ok(n['ok'])} ok, {warn(n['partial'])} partial, {warn(n['unreachable'])} unreachable, "
           f"{bad(n['failed'])} failed of {len(results)} "
           f"servers in {runtime}")
+    print(dim(textwrap.fill(LEGEND, min(shutil.get_terminal_size((100, 20)).columns - 1, 110))))
     for note in notes(n):
         print(warn("\n" + note))
     fast = [r for r in results if r["down"]]

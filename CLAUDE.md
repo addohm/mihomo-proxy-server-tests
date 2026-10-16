@@ -63,8 +63,8 @@ ROADMAP.md    planned work and every decision taken about it
 ```
 
 The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it raises `MihomoError` /
-`SecretNeeded` and reports progress through `run_tests(..., on_event)` events (`start`, `server`, `pinging`,
-`stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
+`SecretNeeded` and reports progress through `run_tests(..., on_event)` events (`start`, `busy`, `server`,
+`pinging`, `stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
 
 ## How it works
 
@@ -83,9 +83,20 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    `GLOBAL`'s list). Each gets a `path` of selector groups from `GLOBAL` (e.g. GLOBAL → PROXY → server),
    found by walking selectors from `GLOBAL`; `None` if no selector reaches it (reported as not selectable).
 5. `test_server`, one server at a time: `state.select` walks the server's path (`PUT /proxies/<group>`) →
-   warm-up probes (≤10 s; first connections are slow) → download via curl through mihomo → upload (one
-   retry if warm-up worked). Timed-out transfers (curl rc 28) keep their speed with a "slow: … hit the time
-   limit" note.
+   warm-up probes (≤10 s; first connections are slow) → `PROBES` (5) connection probes if the warm-up got
+   an answer → download via curl through mihomo → upload (one retry if warm-up worked). Timed-out transfers
+   (curl rc 28) keep their speed with a "slow: … hit the time limit" note.
+   - **Conn ms**: each probe is a new curl run to `generate_204`; its `time_starttransfer` is one sample.
+     Median → `conn`, `jitter()` (mean absolute change between consecutive samples) → `conn_jitter`;
+     failed probes → "N of 5 connections failed".
+   - **Speed** is transfer-only (`mbps`): download = bytes ÷ (total − starttransfer), upload = bytes ÷
+     (total − pretransfer). Reports state `SPEED_METHOD` ("transfer-only") so later comparisons don't mix
+     it with older whole-curl-time speeds.
+   - **Other traffic**: `traffic_total` (`/connections` → `downloadTotal + uploadTotal`) before the download
+     and after the upload; minus curl's own bytes = `other`. Note "busy: other apps used ~N MB" when it is
+     ≥ `BUSY_MIN` (1 MB) and ≥ `BUSY_SHARE` (5 %) of the test's own data. Before the first server a 2 s
+     sample (`other_traffic`) emits `busy` if over `BUSY_RATE` (1 MB/s). Apps that bypass mihomo are
+     invisible; isolating the test from this traffic is the rejected isolated-core approach.
    - **Slow start**: time to the first warm-up response is recorded; over `SLOW_START` (3 s) → "slow start:
      first response after N s"; no warm-up response but the transfers worked → "slow start: no response in
      the first 10 s".
@@ -93,14 +104,20 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      (mihomo streams warnings even at client log level `silent`). A server that isn't ok gets the most
      common `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in
      `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note.
-6. Ping the IP mihomo **actually dialed** (`remote_ip`: `/connections` → `metadata.remoteDestination`, polled
-   during the download). Servers that never connect fall back to the config's `server` host resolved
+6. After **all** transfers (so the test's own traffic doesn't inflate ping or jitter), ping every server
+   together (`PING_COUNT` 10, `PING_WORKERS` 50) at the address mihomo **actually dialed** (`remote_ip`:
+   `/connections` → `metadata.remoteDestination`, polled during the download; some protocols, e.g.
+   hysteria2, report a host name, which is resolved through mihomo's DNS). `ping` returns average, loss and
+   `ping_jitter`. Servers that never connect fall back to the config's `server` host resolved
    through mihomo's DNS (`config_servers` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6
    literals is stripped). macOS: `ping -W` is in ms, IPv6 uses `ping6`.
    - **Direct TCP check** (failed servers only): plain TCP connect to the dialed/resolved IP and the
      config's port, outside mihomo (TUN is off) → `open` / `refused` / `no answer` / `no route`; UDP
      protocols (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the
      config's `proxies` plus its proxy-provider files (`path`, relative to the config's directory).
+   - **CDN label**: if the pinged IP is in Cloudflare's published ranges (`CLOUDFLARE`, 22 prefixes, built
+     in) → "via Cloudflare CDN: ping shows the CDN edge, not the server". Other CDNs only by network owner
+     once `--trace` does owner lookups (roadmap step 4).
    - Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C.
    - Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
@@ -109,12 +126,14 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean the server refused
    the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
 8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). The Markdown
-   adds a "Failure details" section with mihomo's raw errors; the CSV adds `first_response_s`,
-   `direct_check` and `mihomo_error` columns. Falls back to cwd, then the temp dir, if `--out` isn't
+   adds the speed method, a `LEGEND` and a "Failure details" section with mihomo's raw errors. Table cells
+   show jitter as "182 ±12" (Conn ms, Ping ms); the CSV has separate `conn_ms`, `conn_jitter_ms`,
+   `ping_ms`, `ping_jitter_ms` columns plus `first_response_s`, `direct_check`, `other_traffic_mb`,
+   `mihomo_error`, `speed_method`. Falls back to cwd, then the temp dir, if `--out` isn't
    writable. Reports are git-ignored.
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
-Test endpoints: `http://www.gstatic.com/generate_204` (warm-up), `https://speed.cloudflare.com/__down` / `__up`.
+Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probes), `https://speed.cloudflare.com/__down` / `__up`.
 
 ## Remote test server
 
@@ -154,8 +173,11 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
-- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing, `Get-CimInstance` discovery) have
+- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing — now also the per-reply times for jitter — `Get-CimInstance` discovery) have
   never run. A Windows 11 VM is available for this. **macOS** paths have never run and no Mac is available
   (GitHub Actions runners are the plan; see ROADMAP).
-- The current code has only run on the test server in short runs (≤ 4 servers, plus the matrix); no full
-  run of every server and no run on a real desktop client since the package split.
+- Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`) are first choices; tune
+  them after real runs on desktop clients.
+- Only the test server has run the code: a full run of all 45 servers on 2026-10-16 (before step 3; 42 ok,
+  restore verified), short step 3 runs, and the matrix. No run on a real desktop client since the package
+  split.

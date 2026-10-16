@@ -1,7 +1,7 @@
 # mihomo-proxy-server-tests
 
 `mihomo_speedtest.py` tests every server in your **running** mihomo, exactly as mihomo uses it:
-download/upload speed through mihomo and ping to the address it actually dialed. For servers that don't
+connection time and download/upload speed through mihomo, and ping to the address it actually dialed. For servers that don't
 work it shows why: mihomo's own error (e.g. "connection timed out", "config error") plus a direct check of
 the server's port (blocked, refused, or reachable). It also flags servers that are slow to start. Works with
 any mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with
@@ -18,6 +18,14 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 
 ## Reading the results
 
+- **Conn ms**: time until the first response over a new connection through the server (median of 5). This
+  is the latency you feel when an app opens a connection.
+- **Ping ms**: direct ping to the server's address, 10 pings, sent after all transfers have finished.
+- **± (jitter)**: the average change between consecutive measurements. High jitter on Conn ms but not on
+  Ping ms points at the server or its route; high jitter on both points at your own network.
+- **Down / Up Mbps**: speed of the transfer itself, without connection setup (that's in Conn ms).
+
+
 | Result | Meaning |
 |---|---|
 | `ok` | download and upload both worked |
@@ -33,8 +41,20 @@ The **Note** column explains what went wrong, in two parts:
   down), `refused` (nothing listening on that port), `open` (your network reaches it — the proxy connection
   itself was rejected, or the config is wrong). Not possible for UDP protocols such as Hysteria2 and TUIC.
 
-"slow start: first response after N s" means the server works but takes a while to answer its first
-connection. The Markdown report also lists mihomo's exact error message for each server that didn't work.
+Other Notes:
+
+- "N of 5 connections failed": some of the Conn ms connections didn't get an answer, a sign of an unstable
+  server.
+- "busy: other apps used ~N MB during this test": during the test every app that uses mihomo goes through the
+  server under test, so its speed may read low. Apps that bypass mihomo can't be seen.
+- "via Cloudflare CDN": the server is reached through Cloudflare, so ping measures the nearest Cloudflare
+  edge, not the server. Use Conn ms for its real latency.
+- "slow start: first response after N s": the server works but takes a while to answer its first
+  connection.
+
+The Markdown report also lists mihomo's exact error message for each server that didn't work. Reports
+without a "Speed method" line come from older versions, whose speeds included connection setup and so read
+lower.
 
 ## Requirements
 

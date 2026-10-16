@@ -465,7 +465,8 @@ def mihomo_resolve(ctl, host):
 
 
 def remote_ip(ctl, name):
-    """IP mihomo actually dialed for this server, from its live connection list."""
+    """IP (or, for some protocols, host name) mihomo actually dialed for this server, from its live
+    connection list."""
     st, body = ctl.call("GET", "/connections", timeout=5)
     for conn in ((body or {}).get("connections") or []) if st == 200 else []:
         if name in (conn.get("chains") or []):
@@ -474,3 +475,11 @@ def remote_ip(ctl, name):
             if ip:
                 return ip
     return None
+
+
+def traffic_total(ctl):
+    """Bytes mihomo has carried since it started (every connection, both directions), or None."""
+    st, body = ctl.call("GET", "/connections", timeout=5)
+    if st != 200 or not isinstance(body, dict):
+        return None
+    return (body.get("downloadTotal") or 0) + (body.get("uploadTotal") or 0)

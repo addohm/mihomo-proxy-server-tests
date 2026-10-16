@@ -7,52 +7,13 @@ nothing here is started until the user says so. Done items are removed (see git 
 
 1. ~~Config variations matrix~~ — done (`testserver/variant.py`, `matrix.py`)
 2. ~~Diagnosis: mihomo's failure reason, direct TCP check (+ provider file lookup), slow-start flag~~ — done
-3. Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic flag,
-   CDN labels, table layout rework
+3. ~~Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic
+   flag, CDN labels, table layout rework~~ — done
 4. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
 5. Per-user reports folder + baseline / `--compare`
 6. Clearer result labels
 7. GUI (local web page)
 8. Packaging + releases
-
-## 3. Accuracy
-
-- **Connection time through the server** (replaces "latency through the proxy") — right after the warm-up,
-  5 quick probes, each a new connection through the server to a tiny page (`generate_204`); time to first
-  response from curl's `time_starttransfer`. Report the median as a "Conn ms" column, and probe failures in
-  the Note ("2 of 5 connections failed") as a through-the-server stability measure. About 2–5 s per working
-  server. Decided: 5 probes.
-- **Jitter** — average change between consecutive measurements, two kinds: through the server (from the 5
-  connection probes) and direct (from the pings). Comparing them separates "the server/its route wobbles"
-  from "your own network wobbles".
-  - Decided: show **both** in the terminal table and the reports (helps troubleshooting).
-  - Decided: 10 pings per server instead of 4.
-- **Ping timing** — pings currently run while the next server's download fills the connection, inflating
-  ping and direct jitter, which would wrongly blame the user's own network.
-  - Decided: ping **all servers together at the end**, after every transfer has finished (addresses still
-    collected during the run). ~15–20 s once per run; raise the ping pool size accordingly.
-- **Speed excluding connection setup** — compute download/upload speed from the transfer phase only (curl's
-  timings: bytes ÷ (total − time until data starts)), since connection time gets its own column.
-  - Decided: the transfer-only speed **replaces** the current figure. Reports must state the method, so
-    "compare runs" doesn't mix old and new speeds.
-- **Other traffic during the test** — in global mode, the user's other proxied apps also go through the
-  server under test, lowering its measured speed. The script already polls `/connections` during each
-  download; use its per-connection byte counts to measure traffic that isn't the test's own.
-  - Decided: per server, Note "busy: other apps used ~N MB during this test" when other traffic exceeds
-    **5% of the test's own data and at least 1 MB**. At the start, one informational line (no prompt) if
-    other traffic exceeds ~1 MB/s in a 2-second sample. All three numbers are single constants; tune after
-    real runs.
-  - Limit (document it): apps that don't use the proxy bypass mihomo and can't be seen.
-  - Isolating the test from this traffic was the rejected "isolated core" / routing approach — don't
-    reintroduce.
-- **Label CDN-fronted servers** — for servers reached through a CDN (ws/grpc via Cloudflare etc.) the direct
-  ping measures the nearest CDN edge, not the server. Note: "via Cloudflare CDN: ping shows the CDN edge,
-  not the server" (and point to "Conn ms" as the honest latency).
-  - Decided: Cloudflare's published ranges built in (~22 prefixes, no network calls, works everywhere).
-    Other CDNs (Fastly, Akamai, CloudFront…) recognised by network owner only when `--trace` already does
-    owner lookups (step 4) — no extra third-party lookups otherwise.
-- **Table layout rework** — the terminal table is already ~100 characters wide; Conn ms and two jitter
-  columns need new widths/headers.
 
 ## 4. Traceroute on failure (`--trace`)
 
@@ -94,7 +55,7 @@ nothing here is started until the user says so. Done items are removed (see git 
 
 - The user wants clearer answers than ok / partial / unreachable / failed. Every failure now has a cause
   (mihomo's error) and a direct check, so labels like "blocked", "refused", "config error" can be derived;
-  revisit once step 3 is done.
+  step 3 is done, so this can be revisited.
 
 ## 7–8. GUI and packaging (decided 2026-10-15)
 
