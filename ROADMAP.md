@@ -133,6 +133,8 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
     shell whose key is limited to `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, an sshd rule
     allowing it remote forwards only (no `-L` into the server), and `ClientAliveInterval 15` so a dropped
     tunnel frees its port quickly.
+  - reviewed 2026-10-16 (see CLAUDE.md): key ACL reset for SYSTEM, `known_hosts` re-learned on each run,
+    PyYAML installed. Still to do on the tester PC: Windows auto sign-in and the client's start at login.
 - Windows paths (step 5), done before the VM is reachable (from reading the code, checked on Linux only):
   restore runs before the log stream is closed (closing a pipe can block); busy-pipe retry; closing the
   console window restores like Ctrl+C; output can't crash on characters the console encoding lacks. To

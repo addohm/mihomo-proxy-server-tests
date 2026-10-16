@@ -39,11 +39,11 @@ chmod 600 "$f"
 restorecon -R "$home/.ssh" 2>/dev/null || true
 
 if grep -qiE '^\s*Include\s+/etc/ssh/sshd_config\.d/' /etc/ssh/sshd_config; then
+    printf 'ClientAliveInterval 15\nClientAliveCountMax 4\n' > /etc/ssh/sshd_config.d/40-mihomo-tunnel.conf
     # The key option "port-forwarding" also allows local forwards (-L) into this server (e.g. mihomo's
-    # proxy port), so sshd itself allows this user remote forwards only. The Match block ends with the file.
-    cat > /etc/ssh/sshd_config.d/40-mihomo-tunnel.conf <<CONF
-ClientAliveInterval 15
-ClientAliveCountMax 4
+    # proxy port), so sshd itself allows this user remote forwards only. One file per user, so a second
+    # user doesn't replace the first one's rules; a Match block ends with its file.
+    cat > "/etc/ssh/sshd_config.d/41-mihomo-tunnel-$TUSER.conf" <<CONF
 Match User $TUSER
     AllowTcpForwarding remote
     X11Forwarding no

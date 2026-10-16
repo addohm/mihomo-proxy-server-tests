@@ -188,10 +188,18 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
   - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
     mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
     `tunnel`: no shell, no password; key limited to `permitlisten="127.0.0.1:PORT"`; an sshd `Match User`
-    drop-in (`/etc/ssh/sshd_config.d/40-mihomo-tunnel.conf`) allows it remote forwards only — the key
+    drop-in per user (`/etc/ssh/sshd_config.d/41-mihomo-tunnel-USER.conf`; keepalives in
+    `40-mihomo-tunnel.conf`) allows it remote forwards only — the key
     option `port-forwarding` alone also allowed `-L` into the server (e.g. mihomo's unauthenticated proxy
     port). Verified on the test server: own port works; other ports, 0.0.0.0, `-L` and shell refused; root's
     sshd settings unchanged. The test server has the user (no keys yet). VM port: 2222.
+  - PC side, checked by review (2026-10-16; parsed with PowerShell 7, tunnel `ssh` options run against
+    the test server, not yet run on Windows): the tunnel key's ACL is reset to SYSTEM + Administrators
+    (ssh.exe as SYSTEM refuses a key the setup user can also read); `known_hosts` is cleared on each run
+    so a rebuilt server is trusted again; PyYAML is installed. For unattended use the PC also needs
+    Windows auto sign-in and the client set to start at login (the tunnel task starts at boot, the
+    client only at logon). Turning TUN off in the client before setup matters: the script disables
+    adapters named Mihomo/Meta, which could get in the way when the client turns TUN on again.
   - Claude's login key for the VM: `~/.ssh/mihomo-winvm` (to add as `mihomo-winvm` in `~/.ssh/config`,
     `ProxyJump mihomo-testserver`, once the tunnel is up).
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:

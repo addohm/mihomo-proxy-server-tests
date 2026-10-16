@@ -101,7 +101,11 @@ if (-not (Test-Python) -and (Get-Command winget.exe -ErrorAction SilentlyContinu
     & winget.exe install -e --id Python.Python.3.13 --scope machine --accept-package-agreements `
         --accept-source-agreements --override '/quiet InstallAllUsers=1 PrependPath=1 Include_test=0'
 }
-if (Test-Python) { Write-Host "    $(& py.exe -3 --version)" }
+if (Test-Python) {
+    # PyYAML lets the speed test read the controller secret from the client's config (no prompt over SSH)
+    & py.exe -3 -m pip install --quiet --disable-pip-version-check pyyaml
+    Write-Host "    $(& py.exe -3 --version), PyYAML"
+}
 else { Write-Host '    Warning: no Python. Install Python 3 from python.org for all users.' -ForegroundColor Yellow }
 
 Write-Host '==> Power: never sleep on mains power'
@@ -137,6 +141,12 @@ if (-not (Test-Path $Key)) {
         -ArgumentList "-q -t ed25519 -N `"`" -C mihomo-tester-$env:COMPUTERNAME -f `"$Key`""
     if ($p.ExitCode -ne 0) { throw 'ssh-keygen failed' }
 }
+# ssh-keygen gives the key an explicit entry for the user running this; ssh.exe running as SYSTEM refuses a
+# key that any other account can read, so reset it to the folder's SYSTEM + Administrators access
+icacls $Key /reset | Out-Null
+icacls "$Key.pub" /reset | Out-Null
+# trust the server's host key afresh at the next connect (the server or its address may have changed)
+Remove-Item "$Dir\known_hosts" -ErrorAction SilentlyContinue
 $c = if (Test-Path $Conf) { Get-Content $Conf -Raw | ConvertFrom-Json }
      else { [pscustomobject]@{ Host = ''; Port = 22; User = 'tunnel'; RemotePort = 2222; Retries = 0 } }
 do { $c.Host = (Ask 'Server address (IP or host name)' $c.Host).Trim('[', ']') } until ($c.Host)
