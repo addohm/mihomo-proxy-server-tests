@@ -121,9 +121,9 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   restore runs before the log stream is closed (closing a pipe can block); busy-pipe retry; closing the
   console window restores like Ctrl+C; output can't crash on characters the console encoding lacks.
   First runs on the VM (2026-10-16): discovery over Clash Verge Rev's pipe, API, log stream, `curl.exe`,
-  ping, reports, restore and the encoding fix all work (details in CLAUDE.md). Still to check: Ctrl+C
-  and closing the window (by hand on the desktop), a TCP controller with a secret, TUN on, the PyYAML
-  paths, and the matrix (needs a Windows version of `matrix.py`).
+  ping, reports, restore and the encoding fix all work (details in CLAUDE.md). Ctrl+C and closing the
+  window restore everything (`testserver/win_interrupt.py`). Still to check: a TCP controller with a
+  secret, TUN on, the PyYAML paths, and the matrix (needs a Windows version of `matrix.py`).
 - **Tester setup made clear and generic: done 2026-10-16, as its own project, revtunnel**
   (`addohm/revtunnel`). After the first VM run, where the user couldn't tell what was going on or what to
   do, the user asked for guided steps that say what, why and **where** (PC / server), and for a tool that

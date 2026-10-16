@@ -10,6 +10,7 @@ Windows tester PCs reached through a reverse SSH tunnel (set up with
 | `variant.py` | test server | Switches mihomo into one config variant (controller, secret, port, TUN, source) |
 | `matrix.py` | test server | Runs the speed test on every variant and checks it found, tested and restored |
 | `tester-windows.cmd` | Windows tester PC | revtunnel preset for a tester PC (double-click) |
+| `win_interrupt.py` | Windows tester PC | Stops a speed test with Ctrl+C or by closing its window, and checks mihomo was restored |
 
 The scripts' headers have every option; this page is the workflow.
 
@@ -65,6 +66,18 @@ troubleshooting. For a tester PC:
 Then, from the test server: `ssh -p PORT WINDOWS_USER@127.0.0.1`. Re-run `tester-windows.cmd` any time
 for the status, a new server address, more login keys or removal. `sudo bash revtunnel-server.sh --list`
 on the server shows every tester PC and whether it's connected.
+
+**Testing on the PC** goes through the tunnel; nobody needs to be at the PC:
+
+```bash
+scp -r mihomo_speedtest.py mihomotest testserver/win_interrupt.py mihomo-winvm:C:/Users/USER/mst/
+ssh mihomo-winvm 'py -3 C:\Users\USER\mst\mihomo_speedtest.py --filter "Hong Kong"'
+ssh mihomo-winvm 'py -3 C:\Users\USER\mst\win_interrupt.py C:\Users\USER\mst\mihomo_speedtest.py ctrlc'   # or: close
+```
+
+`win_interrupt.py` starts the speed test in its own console, stops it at the second server (Ctrl+C, or
+closing the window like clicking X) and prints PASS if mode, TUN, port and every group's selection are
+back as before.
 
 For unattended runs, also set Windows to sign in automatically and the mihomo client to start at login
 (the tunnel starts at boot; the client only when someone signs in). Start long test runs detached and read

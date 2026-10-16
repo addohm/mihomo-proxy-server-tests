@@ -64,6 +64,7 @@ mihomotest/
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
               tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
+              win_interrupt.py (Windows PC: Ctrl+C / close-window restore test, no desktop needed);
               README.md (workflow and usage of all of these)
 ROADMAP.md    planned work and every decision taken about it
 ```
@@ -195,6 +196,13 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied 
     disabled by the first setup.
   - For unattended use the PC also needs Windows auto sign-in and the client set to start at login (the
     tunnel starts at boot, the client only at logon).
+  - **Test it yourself over the tunnel; don't ask the user to run things on the PC** (user, 2026-10-16:
+    asking defeats the purpose of the tunnel). Copy the code with `scp -r mihomo_speedtest.py mihomotest
+    mihomo-winvm:C:/Users/addohm/mst/` and run `py -3 …` over `ssh mihomo-winvm` (PowerShell is the
+    shell; for anything with quotes, copy a small script over instead of a one-liner). Ctrl+C and closing
+    the window: `testserver/win_interrupt.py` (starts the test in its own console, interrupts it, checks
+    the restore). Processes started from an SSH session inherit "ignore Ctrl+C", so a plain
+    `Start-Process` never sees a Ctrl+C. Put back any selection you change for a test.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
@@ -209,8 +217,9 @@ user says so.
   built-in default pipe names would miss it), no secret needed; API, `/logs` stream (mihomo's dial errors),
   `curl.exe` (Schannel; HTTPS worked, no revocation failure), ping parsing, reports and restore (every
   group) all work; output to a file with Python's legacy encoding (`-X utf8=0`) doesn't crash. Ping
-  parsing also checked offline with zh-CN / de-DE / ja-JP / IPv6 samples. Not yet checked on Windows:
-  Ctrl+C and closing the console window (need the desktop), a TCP controller with a secret, TUN on,
+  parsing also checked offline with zh-CN / de-DE / ja-JP / IPv6 samples. Ctrl+C and closing the console
+  window restore everything (`win_interrupt.py`, both PASS; a closed window ends the process ~1 s later
+  with 0xC000013A, after the restore). Not yet checked on Windows: a TCP controller with a secret, TUN on,
   the PyYAML paths (no wheel for Python 3.15 yet), and a Windows matrix. **macOS** paths have never run
   and no Mac is available (GitHub Actions runners are the plan; see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
