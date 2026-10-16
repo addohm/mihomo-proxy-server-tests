@@ -178,6 +178,6 @@ user says so.
   (GitHub Actions runners are the plan; see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`) are first choices; tune
   them after real runs on desktop clients.
-- Only the test server has run the code: a full run of all 45 servers on 2026-10-16 (before step 3; 42 ok,
-  restore verified), short step 3 runs, and the matrix. No run on a real desktop client since the package
+- Only the test server has run the code: full runs of all 45 servers on 2026-10-16 before and after step 3
+  (42 ok both times, restore verified; ~5.5 → ~8 min with the connection probes), and the matrix. No run on a real desktop client since the package
   split.
