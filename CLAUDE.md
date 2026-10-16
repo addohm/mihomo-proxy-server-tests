@@ -194,7 +194,9 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied 
     Python 3.15, plus 3.13.16 with PyYAML 6.0.3 since 2026-10-16: run `py -V:3.13`); moving it to the preset is pending (it cuts the SSH session the other
     VM work uses, so coordinate first: set up the preset on port 2223, check a login there, then remove
     the old task and switch `mihomo-winvm` to 2223). Its mihomo client's TUN adapter (`Meta`) was
-    disabled by the first setup.
+    disabled by the first setup. **TUN stays off at rest on the tester PC** (user, 2026-10-16), so the
+    tunnel never runs through the client under test; turn it on only for a TUN test, and turn it off
+    again after.
   - For unattended use the PC also needs Windows auto sign-in and the client set to start at login (the
     tunnel starts at boot, the client only at logon).
   - **Test it yourself over the tunnel; don't ask the user to run things on the PC** (user, 2026-10-16:
