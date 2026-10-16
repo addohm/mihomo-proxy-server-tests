@@ -16,7 +16,6 @@ LEGEND = ("Conn ms: time to the first response over a new connection through the
           "± is the jitter: the average change between consecutive measurements. "
           "Speeds count the transfer itself, not the connection setup.")
 SPEED_METHOD = "transfer-only"  # bytes / time after the transfer starts (older reports: whole curl time)
-WHOLE_TIME = "whole-time"  # per server, when a transfer was too quick to time on its own (MIN_TRANSFER)
 
 HEADERS = ["#", "Server", "Type", "Conn ms", "Ping ms", "Loss %", "Down Mbps", "Up Mbps", "Result"]
 
@@ -61,8 +60,7 @@ def save_reports(results, meta, out_dir):
     lines = ["# mihomo server test", "",
              f"- Date: {meta['date']}", f"- mihomo: {meta['version']} ({meta['api']})",
              f"- Download size: {meta['size']:g} MB, upload {meta['size'] / 2:g} MB",
-             f"- Speed method: {SPEED_METHOD} (transfer phase only, without connection setup; transfers too "
-             "quick to time on their own use the whole time and say so in the Note)",
+             f"- Speed method: {SPEED_METHOD} (transfer phase only, without connection setup)",
              f"- Servers: {meta['total']}, ok: {meta['ok']}, partial: {meta['partial']}, "
              f"unreachable: {meta['unreachable']}, failed: {meta['failed']}",
              f"- Runtime: {meta['runtime']}", "",
@@ -89,6 +87,5 @@ def save_reports(results, meta, out_dir):
             w.writerow([r["name"], r["type"], num(r["conn"], 1), num(r["conn_jitter"], 1), num(r["ping"], 1),
                         num(r["ping_jitter"], 1), "" if r["loss"] is None else r["loss"],
                         num(r["down"], 2), num(r["up"], 2), r["result"], r["note"], num(r["first"], 1),
-                        r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"],
-                        WHOLE_TIME if r["short"] else SPEED_METHOD])
+                        r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"], SPEED_METHOD])
     return md_path, csv_path

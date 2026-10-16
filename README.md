@@ -24,8 +24,8 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 - **± (jitter)**: the average change between consecutive measurements. High jitter on Conn ms but not on
   Ping ms points at the server or its route; high jitter on both points at your own network.
 - **Down / Up Mbps**: speed of the transfer itself, without connection setup (that's in Conn ms). On very
-  fast servers a transfer can finish too quickly to time on its own; the speed then includes connection
-  setup and the Note says so. Use a larger `--size` for those.
+  fast servers a 10 MB transfer can finish too quickly to time reliably; the Note then says so. Run again
+  with a larger `--size` (e.g. `--size 50`) for an accurate figure.
 
 
 | Result | Meaning |

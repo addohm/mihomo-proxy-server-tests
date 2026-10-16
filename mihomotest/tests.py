@@ -23,7 +23,7 @@ UDP_TYPES = {"hysteria", "hysteria2", "tuic", "wireguard"}  # no TCP port to che
 PROBES = 5  # new connections through each working server, for Conn ms and its jitter
 PING_COUNT = 10
 PING_WORKERS = 50  # all servers are pinged together at the end of the run
-MIN_TRANSFER = 0.2  # s; a shorter transfer phase can't be timed reliably, so the whole curl time is used
+MIN_TRANSFER = 0.2  # s; a shorter transfer phase can't be timed reliably, so it's flagged
 BUSY_SHARE, BUSY_MIN = 0.05, 1e6  # other traffic flagged when > 5% of the test's own data and >= 1 MB
 BUSY_RATE = 1e6  # bytes/s of other traffic at the start that's worth mentioning
 # Cloudflare's published ranges (cloudflare.com/ips): servers behind its CDN answer ping from the nearest edge
@@ -65,14 +65,12 @@ def curl(proxy, url, extra=(), max_time=20):
         return rc, {"code": 0, "pre": 0.0, "start": 0.0, "total": 0.0, "down": 0, "up": 0}
 
 
-def mbps(nbytes, transfer, total):
-    """Speed of the transfer phase only (connection setup is measured separately, as Conn ms). If that phase
-    is shorter than MIN_TRANSFER it can't be timed reliably, so the whole curl time is used instead.
-    Returns (Mbps | None, whole_time_used)."""
+def mbps(nbytes, seconds):
+    """Speed of the transfer phase only (connection setup is measured separately, as Conn ms).
+    Returns (Mbps | None, too_short): a phase under MIN_TRANSFER can't be timed reliably."""
     if nbytes <= 0:
         return None, False
-    short = transfer < MIN_TRANSFER
-    return nbytes * 8 / 1e6 / max(total if short else transfer, 1e-3), short
+    return nbytes * 8 / 1e6 / max(seconds, 1e-3), seconds < MIN_TRANSFER
 
 
 def jitter(values):
@@ -189,7 +187,7 @@ def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
         drc, t = fut.result()
     own += t["down"] + t["up"]
     if t["code"] == 200 and t["down"] > 0:
-        r["down"], short = mbps(t["down"], t["total"] - t["start"], t["total"])
+        r["down"], short = mbps(t["down"], t["total"] - t["start"])
         if short:
             r["short"].append("download")
         if drc == 28:
@@ -199,7 +197,7 @@ def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
         urc, t = curl(proxy, UP_URL, ["-H", "Expect:", "--data-binary", f"@{up_file}"], timeout)
         own += t["down"] + t["up"]
         if (t["code"] in (200, 201, 204) or urc == 28) and t["up"] > 0:
-            r["up"], short = mbps(t["up"], t["total"] - t["pre"], t["total"])
+            r["up"], short = mbps(t["up"], t["total"] - t["pre"])
             if short:
                 r["short"].append("upload")
             if urc == 28:
@@ -211,8 +209,7 @@ def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
         if r["other"] >= max(BUSY_MIN, BUSY_SHARE * own) and own:
             add_note(r, f"busy: other apps used ~{r['other'] / 1e6:.0f} MB during this test")
     if r["short"]:
-        add_note(r, f"{' and '.join(r['short'])} too quick to time on its own: speed includes connection setup "
-                    "(try a larger --size)")
+        add_note(r, f"{' and '.join(r['short'])} too quick to time reliably: use a larger --size")
     if lost:
         add_note(r, f"{lost} of {PROBES} connections failed")
     worked = r["down"] is not None or r["up"] is not None

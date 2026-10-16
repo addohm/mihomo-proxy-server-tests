@@ -91,9 +91,9 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      failed probes → "N of 5 connections failed".
    - **Speed** is transfer-only (`mbps`): download = bytes ÷ (total − starttransfer), upload = bytes ÷
      (total − pretransfer). A transfer phase under `MIN_TRANSFER` (0.2 s) can't be timed reliably (10 MB at
-     2 Gbps is ~40 ms), so that speed uses the whole curl time instead, with a "too quick to time on its own
-     … (try a larger --size)" Note. Reports state `SPEED_METHOD` ("transfer-only"; per CSV row
-     `whole-time` when a fallback was used) so later comparisons don't mix methods.
+     2 Gbps is ~40 ms): the speed is kept but the Note says "… too quick to time reliably: use a larger
+     --size". No automatic fallback or size change — the user decides with `--size` (user's decision,
+     2026-10-16). Reports state `SPEED_METHOD` ("transfer-only") so later comparisons don't mix methods.
    - **Other traffic**: `traffic_total` (`/connections` → `downloadTotal + uploadTotal`) before the download
      and after the upload; minus curl's own bytes = `other`. Note "busy: other apps used ~N MB" when it is
      ≥ `BUSY_MIN` (1 MB) and ≥ `BUSY_SHARE` (5 %) of the test's own data. Before the first server a 2 s
