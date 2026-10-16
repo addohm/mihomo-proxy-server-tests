@@ -117,11 +117,11 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      config's `proxies` plus its proxy-provider files (`path`, relative to the config's directory).
    - **CDN label**: if the pinged IP is in Cloudflare's published ranges (`CLOUDFLARE`, 22 prefixes, built
      in) → "via Cloudflare CDN: ping shows the CDN edge, not the server". Other CDNs only by network owner
-     once `--trace` does owner lookups (roadmap step 4).
+     once `--trace` does owner lookups (roadmap step 6).
    - Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C.
    - Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
-   Labels stay these four for now (clearer labels are roadmap step 6); the cause and the direct check go in
+   Labels stay these four for now (clearer labels are roadmap step 8); the cause and the direct check go in
    the Note (e.g. "connection timed out; direct check: port 43000 no answer"). `UNREACHABLE_NOTE` /
    `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean the server refused
    the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.

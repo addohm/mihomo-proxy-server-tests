@@ -9,13 +9,17 @@ nothing here is started until the user says so. Done items are removed (see git 
 2. ~~Diagnosis: mihomo's failure reason, direct TCP check (+ provider file lookup), slow-start flag~~ — done
 3. ~~Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic
    flag, CDN labels, table layout rework~~ — done
-4. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
-5. Per-user reports folder + baseline / `--compare`
-6. Clearer result labels
-7. GUI (local web page)
-8. Packaging + releases
+4. Remote tester inside China (reverse SSH tunnel; see the section below)
+5. Windows paths: test and fix on the China tester / the Windows 11 VM
+6. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
+7. Per-user reports folder + baseline / `--compare`
+8. Clearer result labels
+9. GUI (local web page)
+10. Packaging + releases
 
-## 4. Traceroute on failure (`--trace`)
+Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
+
+## 6. Traceroute on failure (`--trace`)
 
 - An ICMP trace is useless for "unreachable" servers (ICMP already gets through); they need a TCP trace to
   the proxy port. An ICMP trace is still useful for "failed" servers.
@@ -32,7 +36,7 @@ nothing here is started until the user says so. Done items are removed (see git 
   already makes work on their network), fall back to whois.cymru.com on TCP 43, otherwise show the IP only.
   Only runs with `--trace`; document that hop IPs are sent to that lookup service.
 
-## 5. Reports folder and compare runs
+## 7. Reports folder and compare runs
 
 - Decided: reports and baseline go to one **per-user folder** for both script and app (e.g.
   `Documents/mihomo-speedtest`); `--out` still overrides. This changes the script's current default (next
@@ -51,13 +55,13 @@ nothing here is started until the user says so. Done items are removed (see git 
   - The comparison header shows both dates and warns that a baseline from another network or time of day
     isn't a fair comparison.
 
-## 6. Clearer result labels
+## 8. Clearer result labels
 
 - The user wants clearer answers than ok / partial / unreachable / failed. Every failure now has a cause
   (mihomo's error) and a direct check, so labels like "blocked", "refused", "config error" can be derived;
   step 3 is done, so this can be revisited.
 
-## 7–8. GUI and packaging (decided 2026-10-15)
+## 9–10. GUI and packaging (decided 2026-10-15)
 
 - **GUI as a local web page.** The program runs a small stdlib web server and opens a page in the user's
   normal browser: live results table, server checkboxes instead of `--filter`, sortable columns, a
@@ -98,12 +102,12 @@ nothing here is started until the user says so. Done items are removed (see git 
   paths (discovery, named pipe, ping parsing, curl, restore).
 - A Windows 11 VM is available (2026-10-15) for testing the Windows paths by hand.
 
-## Remote tester inside China (added 2026-10-16, not scheduled)
+## 4–5. Remote tester inside China, Windows paths (added 2026-10-16)
 
 - Goal: a Windows machine in mainland China, behind a dynamic IP (no inbound SSH), that receives our changes,
   runs the script (and later the matrix / packaged builds) against a real desktop client there, and reports
   the results back. This covers what the US test server can't: Chinese networks, GFW behaviour, the
-  China-only paths (e.g. hop owners via mihomo's DNS in step 4) and Windows.
+  China-only paths (e.g. hop owners via mihomo's DNS in step 6) and Windows.
 - Decided (2026-10-16): **reverse SSH tunnel**. The China machine keeps an outbound SSH connection to our
   test VPS with a remote forward (`ssh -R`) to its own SSH server; we reach it with plain SSH through the
   VPS, as with the test server today. Rejected for now: a second Discord bot (Discord is blocked in
