@@ -65,6 +65,7 @@ Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all op
 
 Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script runs the code in that folder.
 
-Status: in use on Linux. Windows and macOS support is written but not yet tested.
+Status: in use on Linux. Windows: first runs with Clash Verge Rev work; more configurations still to be
+tested. macOS support is written but not yet tested.
 
 Planned features: see [ROADMAP.md](ROADMAP.md).

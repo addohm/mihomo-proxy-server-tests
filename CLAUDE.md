@@ -214,13 +214,18 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
-- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing — now also the per-reply times
-  for jitter — `Get-CimInstance` discovery, the console-close handler, busy-pipe retry) have never run.
-  A Windows 11 VM is available for this (roadmap step 5); still to check there: Schannel certificate
-  revocation checks in `curl.exe` (they bypass the proxy and may fail, e.g. from China). **macOS** paths have never run and no Mac is available
-  (GitHub Actions runners are the plan; see ROADMAP).
+- **Windows** (roadmap step 5), first runs on the VM 2026-10-16 (Clash Verge Rev in service mode, mihomo
+  v1.19.32, Python 3.15, no PyYAML, en-US, from mainland China): `Get-CimInstance` discovery finds the core
+  in session 0 and its per-user pipe `\\.\pipe\verge-mihomo-production-<hash>` from `-ext-ctl-pipe` (the
+  built-in default pipe names would miss it), no secret needed; API, `/logs` stream (mihomo's dial errors),
+  `curl.exe` (Schannel; HTTPS worked, no revocation failure), ping parsing, reports and restore (every
+  group) all work; output to a file with Python's legacy encoding (`-X utf8=0`) doesn't crash. Ping
+  parsing also checked offline with zh-CN / de-DE / ja-JP / IPv6 samples. Not yet checked on Windows:
+  Ctrl+C and closing the console window (need the desktop), a TCP controller with a secret, TUN on,
+  the PyYAML paths (no wheel for Python 3.15 yet), and a Windows matrix. **macOS** paths have never run
+  and no Mac is available (GitHub Actions runners are the plan; see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.
-- Only the test server has run the code: full runs of all 45 servers on 2026-10-16 before and after step 3
-  (42 ok both times, restore verified; ~5.5 → ~8 min with the connection probes), and the matrix. No run on a real desktop client since the package
-  split.
+- Runs so far: the test server (full runs of all 45 servers on 2026-10-16 before and after step 3, 42 ok
+  both times, restore verified, ~5.5 → ~8 min with the connection probes; the matrix) and short runs on
+  the Windows VM with Clash Verge Rev (see above). No full run on a desktop client yet.
