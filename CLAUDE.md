@@ -190,7 +190,7 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied 
   - The VM (in mainland China, Windows 11, user `addohm`) is reachable: `ssh mihomo-winvm` (in
     `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump mihomo-testserver`). It still
     runs the **pre-revtunnel** tunnel (task "mihomo-tester tunnel", `C:\ProgramData\mihomo-tester`,
-    Python 3.15 without PyYAML); moving it to the preset is pending (it cuts the SSH session the other
+    Python 3.15, plus 3.13.16 with PyYAML 6.0.3 since 2026-10-16: run `py -V:3.13`); moving it to the preset is pending (it cuts the SSH session the other
     VM work uses, so coordinate first: set up the preset on port 2223, check a login there, then remove
     the old task and switch `mihomo-winvm` to 2223). Its mihomo client's TUN adapter (`Meta`) was
     disabled by the first setup.
