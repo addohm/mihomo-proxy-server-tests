@@ -122,7 +122,7 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
     VPN/TUN adapters, so the tunnel goes direct; for a mihomo client's TUN it tells the user to turn TUN
     off in the client too. This replaces the earlier plan of excluding the VPS address from TUN routing;
   - makes the PC's own tunnel key, **asks for the server address** (it can change: re-run, enter the new
-    one, Enter for the rest), shows the key plus the commands to run on the server, then starts a
+    one, Enter for the rest), shows the key plus the command to run on the server, then starts a
     scheduled task (SYSTEM, at startup) that keeps `ssh -R 127.0.0.1:PORT:127.0.0.1:22` up: keepalives
     every 15 s notice a dead tunnel within a minute, then it reconnects every 15 s, **indefinitely by
     default or a chosen number of attempts in a row** (asked at setup; a connection that lasted a minute

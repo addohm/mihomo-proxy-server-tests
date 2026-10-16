@@ -181,7 +181,9 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
   them afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
 - **Windows tester** (roadmap step 4): `testserver/setup-windows.ps1` sets up a fresh Windows 11 PC (OpenSSH
   server on 127.0.0.1, Python, VPNs off) and keeps a reverse tunnel to a server; reach it from that server
-  with `ssh -p PORT WINUSER@127.0.0.1`. Usage: the script's header and output. Keep it ASCII-only (Windows
+  with `ssh -p PORT WINUSER@127.0.0.1`. The tunnel (SYSTEM scheduled task, `ssh -R` with 15 s keepalives)
+  reconnects every 15 s, indefinitely by default or N attempts in a row (asked at setup; a connection
+  that lasted a minute resets the count). Usage: the script's header and output. Keep it ASCII-only (Windows
   PowerShell 5.1 reads BOM-less files as ANSI). Not yet run on Windows.
   - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
     mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
