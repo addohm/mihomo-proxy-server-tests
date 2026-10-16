@@ -164,6 +164,14 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
     (server address, add a login key, or everything).
   - README quick start marks where each step happens (PC / server); scripts are checked on the VM
     (`ssh mihomo-winvm`) before they're handed over.
+  - **Generic and repeatable** (user, 2026-10-16): the tunnel tooling becomes its own project (a
+    separate repo, e.g. `revtunnel`), usable for any reverse tunnel; this repo keeps only a mihomo-tester
+    preset and a pointer. Decided: PC side for **Windows and Linux** (scheduled task / systemd service;
+    macOS later); the tunnel leads to **any port** on the PC (default 22, which installs the PC's SSH
+    server; e.g. RDP 3389 or a web UI otherwise); named tunnels (folder, task/service and log per name;
+    several per PC); optional extras chosen at setup (keep awake, VPNs off, install Python), all on in
+    the mihomo-tester preset; every answer also as a parameter, so a PC can be set up from a script.
+    Server side: `tunnel-host.sh` without mihomo names, plus `--list` and `--remove PORT`.
 - Still open:
   - Tests still run detached and are polled from a log, as with the matrix.
   - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.
