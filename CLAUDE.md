@@ -78,12 +78,17 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
    `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
    HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time
-   out); `Controller.stream` opens long-lived GETs such as `/logs`.
+   out; opening a busy pipe is retried for up to 2 s); `Controller.stream` opens long-lived GETs such as
+   `/logs`.
 3. `MihomoState`: records mode, TUN, `GLOBAL` selection (and, as they're touched, every other selector
    group's selection); turns TUN off, sets mode `global`; opens a temporary `mixed-port` only if there's no
-   local proxy port. `restore()` runs in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK) and puts every touched
-   group back (inner groups first, `GLOBAL` last); those signals are ignored while it runs so a second
-   Ctrl+C can't cut it short.
+   local proxy port. `restore()` runs first in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK), before anything
+   that could delay it (e.g. closing the log stream, which on a Windows pipe is done in a daemon thread
+   because it can block), and puts every touched group back (inner groups first, `GLOBAL` last); those
+   signals are ignored while it runs so a second Ctrl+C can't cut it short. Windows: closing the console
+   window, logoff or shutdown gives ~5 s and no signal, so `stop_on_console_close` (cli, ctypes
+   `SetConsoleCtrlHandler`) turns it into Ctrl+C and holds the window until the `restored` event.
+   stdout/stderr use `errors="replace"` so ✔/± or server names can't crash output redirected on Windows.
 4. `list_servers`: servers from `/proxies` plus `/providers/proxies` (provider servers are **not** in
    `GLOBAL`'s list). Each gets a `path` of selector groups from `GLOBAL` (e.g. GLOBAL → PROXY → server),
    found by walking selectors from `GLOBAL`; `None` if no selector reaches it (reported as not selectable).
@@ -184,8 +189,10 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
-- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing — now also the per-reply times for jitter — `Get-CimInstance` discovery) have
-  never run. A Windows 11 VM is available for this. **macOS** paths have never run and no Mac is available
+- **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing — now also the per-reply times
+  for jitter — `Get-CimInstance` discovery, the console-close handler, busy-pipe retry) have never run.
+  A Windows 11 VM is available for this (roadmap step 5); still to check there: Schannel certificate
+  revocation checks in `curl.exe` (they bypass the proxy and may fail, e.g. from China). **macOS** paths have never run and no Mac is available
   (GitHub Actions runners are the plan; see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.

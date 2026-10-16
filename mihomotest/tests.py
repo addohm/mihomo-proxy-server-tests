@@ -326,9 +326,9 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
         stopped = True
         emit("stopped", {})
     finally:
+        state.restore()  # first: nothing below may delay or prevent it
         if logs:
             logs.stop()
-        state.restore()
         for f in list(pings.values()) + [fut for _, fut in checks.values()]:
             f.cancel()  # when stopped, don't wait for queued pings/checks at exit
         pinger.shutdown(wait=False)

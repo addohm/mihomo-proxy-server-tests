@@ -15,8 +15,8 @@ What it does
   4. After all transfers, pings every server address mihomo actually connected to
      (10 pings each). Servers behind Cloudflare's CDN are labelled: their ping shows
      the CDN edge, not the server.
-  5. Restores TUN, mode and your server selections (also on Ctrl+C), prints the results
-     and saves a Markdown and a CSV report.
+  5. Restores TUN, mode and your server selections (also on Ctrl+C, or on Windows when the
+     window is closed), prints the results and saves a Markdown and a CSV report.
 
 Works on Linux, macOS and Windows. Uses the system's curl and ping.
 While the test runs, traffic that goes through mihomo uses the server under test.
@@ -39,6 +39,7 @@ import shutil
 import signal
 import sys
 import textwrap
+import threading
 import time
 import unicodedata
 
@@ -49,6 +50,10 @@ from .tests import counts, run_tests
 
 if IS_WIN:
     os.system("")  # enable ANSI colours in Windows terminals
+for _stream in (sys.stdout, sys.stderr):  # e.g. ✔ or server names when output goes to a file on Windows
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+RESTORED = threading.Event()
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # where mihomo_speedtest.py lives
 WIDTHS = [(3, True), (28, False), (9, False), (10, True), (10, True), (6, True), (9, True), (8, True), (11, False)]
@@ -160,8 +165,27 @@ def on_event(kind, data):
         clear_status()
         print(warn("\nStopped - showing the servers tested so far."))
     elif kind == "restored":
+        RESTORED.set()
         clear_status()
         print(dim(f"\nmihomo restored: {data['state'].describe()}."))
+
+
+def stop_on_console_close():
+    """Windows: closing the console window (or logging off / shutting down) gives the process ~5 s and no
+    signal Python sees. Turn it into Ctrl+C and hold the window until mihomo is restored. Returns the
+    handler, which must be kept referenced."""
+    import _thread
+    import ctypes
+
+    @ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)
+    def handler(event):
+        if event not in (2, 5, 6):  # CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT
+            return 0  # Ctrl+C / Ctrl+Break: Python's own handling
+        _thread.interrupt_main()
+        RESTORED.wait(4.5)
+        return 1
+    ctypes.windll.kernel32.SetConsoleCtrlHandler(handler, True)
+    return handler
 
 
 def positive(kind):
@@ -200,6 +224,7 @@ def main():
                 signal.signal(getattr(signal, sig), stop)
             except (OSError, ValueError):
                 pass
+    close_handler = stop_on_console_close() if IS_WIN else None  # noqa: F841 - must stay referenced
 
     t0 = time.time()
     try:

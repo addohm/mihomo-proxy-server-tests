@@ -39,8 +39,18 @@ class Controller:
     def __str__(self):
         return {"tcp": f"http://{self.addr}", "unix": f"unix:{self.addr}", "pipe": self.addr}[self.kind]
 
+    def _open_pipe(self):
+        deadline = time.time() + 2
+        while True:
+            try:
+                return open(self.addr, "r+b", buffering=0)
+            except OSError as e:  # all instances busy (e.g. the log stream holds one): wait for the next
+                if getattr(e, "winerror", None) != 231 or time.time() > deadline:  # ERROR_PIPE_BUSY
+                    raise
+                time.sleep(0.05)
+
     def _pipe_exchange(self, raw):
-        with open(self.addr, "r+b", buffering=0) as f:
+        with self._open_pipe() as f:
             f.write(raw)
             chunks = []
             while True:
@@ -115,7 +125,7 @@ class Controller:
         """Open a long-lived GET (e.g. /logs). Returns (closer, binary file positioned after the headers);
         raises OSError if it can't be opened or isn't HTTP 200."""
         if self.kind == "pipe":
-            f = open(self.addr, "r+b", buffering=0)
+            f = self._open_pipe()
             f.write(self._request("GET", path))
             closer = f
         else:
@@ -168,13 +178,15 @@ class LogWatcher:
 
     def stop(self):
         self._stopped = True
-        try:
-            if isinstance(self._closer, socket.socket):
-                self._closer.shutdown(socket.SHUT_RDWR)  # wakes the blocked read
-            if self._closer:
-                self._closer.close()
-        except OSError:
-            pass
+        closer = self._closer
+        if isinstance(closer, socket.socket):
+            try:
+                closer.shutdown(socket.SHUT_RDWR)  # wakes the blocked read
+                closer.close()
+            except OSError:
+                pass
+        elif closer:  # a Windows pipe: closing it while the read is blocked can hang, so don't wait for it
+            threading.Thread(target=closer.close, daemon=True).start()
 
 
 @functools.lru_cache(maxsize=None)

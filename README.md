@@ -15,7 +15,7 @@ python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fa
 ```
 
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
-(also on Ctrl+C). Results are printed and saved next to the script as
+(also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved next to the script as
 `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
 
 ## Reading the results

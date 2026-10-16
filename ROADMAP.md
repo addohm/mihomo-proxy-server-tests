@@ -131,6 +131,12 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   - server side (printed commands): a user (`tunnel`) with no shell whose key is limited to
     `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, and `ClientAliveInterval 15` so a dropped
     tunnel frees its port quickly.
+- Windows paths (step 5), done before the VM is reachable (from reading the code, checked on Linux only):
+  restore runs before the log stream is closed (closing a pipe can block); busy-pipe retry; closing the
+  console window restores like Ctrl+C; output can't crash on characters the console encoding lacks. To
+  check on Windows: all of these, discovery (PowerShell, `%APPDATA%`, default pipes) with Clash Verge Rev
+  over its pipe and over TCP, localised ping, `curl.exe` revocation checks, and the matrix (needs a
+  Windows version of `matrix.py`).
 - Still open:
   - Tests still run detached and are polled from a log, as with the matrix.
   - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.
