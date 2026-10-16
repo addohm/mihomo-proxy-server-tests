@@ -65,6 +65,7 @@ mihomotest/
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
               tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
               win_interrupt.py (Windows PC: Ctrl+C / close-window restore test, no desktop needed);
+              win_matrix.py (Windows PC: config variants loaded through the API, like matrix.py);
               README.md (workflow and usage of all of these)
 ROADMAP.md    planned work and every decision taken about it
 ```
@@ -219,8 +220,15 @@ user says so.
   group) all work; output to a file with Python's legacy encoding (`-X utf8=0`) doesn't crash. Ping
   parsing also checked offline with zh-CN / de-DE / ja-JP / IPv6 samples. Ctrl+C and closing the console
   window restore everything (`win_interrupt.py`, both PASS; a closed window ends the process ~1 s later
-  with 0xC000013A, after the restore). Not yet checked on Windows: a TCP controller with a secret, TUN on,
-  the PyYAML paths (no wheel for Python 3.15 yet), and a Windows matrix. **macOS** paths have never run
+  with 0xC000013A, after the restore). `testserver/win_matrix.py` (config variants loaded
+  through `PUT /configs` from a copy of the core's `-f` file, original loaded back at the end; the client's
+  settings untouched): default, secret, socks, http, noport, provider all PASS with Python 3.13 + PyYAML,
+  default and secret also with 3.15 without PyYAML. Findings: mihomo doesn't check the secret on a named
+  pipe (right, none or wrong all get 200), so on Windows the secret only matters for a TCP controller; and
+  mihomo opens a TCP controller only at start-up, not when a config is loaded through the API (so the
+  Windows matrix can't cover it; the code is OS-independent and `matrix.py` covers it on Linux). Not yet
+  checked on Windows: TUN on at rest (it also carries the tunnel), and the PyYAML path for failed servers
+  (ping / direct check from the config's address; the check was cut off). **macOS** paths have never run
   and no Mac is available (GitHub Actions runners are the plan; see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.

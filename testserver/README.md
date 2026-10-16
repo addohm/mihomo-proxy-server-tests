@@ -10,6 +10,7 @@ Windows tester PCs reached through a reverse SSH tunnel (set up with
 | `variant.py` | test server | Switches mihomo into one config variant (controller, secret, port, TUN, source) |
 | `matrix.py` | test server | Runs the speed test on every variant and checks it found, tested and restored |
 | `tester-windows.cmd` | Windows tester PC | revtunnel preset for a tester PC (double-click) |
+| `win_matrix.py` | Windows tester PC | Config variants of the PC's mihomo client, loaded through its API: found, tested, restored |
 | `win_interrupt.py` | Windows tester PC | Stops a speed test with Ctrl+C or by closing its window, and checks mihomo was restored |
 
 The scripts' headers have every option; this page is the workflow.
@@ -73,6 +74,15 @@ on the server shows every tester PC and whether it's connected.
 scp -r mihomo_speedtest.py mihomotest testserver/win_interrupt.py mihomo-winvm:C:/Users/USER/mst/
 ssh mihomo-winvm 'py -3 C:\Users\USER\mst\mihomo_speedtest.py --filter "Hong Kong"'
 ssh mihomo-winvm 'py -3 C:\Users\USER\mst\win_interrupt.py C:\Users\USER\mst\mihomo_speedtest.py ctrlc'   # or: close
+```
+
+`win_matrix.py` is the Windows matrix: it loads variants of the client's config (secret, socks/http port,
+no port, provider) through mihomo's API, tests two servers in each, checks the restore, and loads the
+client's own config back at the end. It needs PyYAML (`py -V:3.13` on the tester PC); `--python` picks
+the Python that runs the speed test:
+
+```bash
+ssh mihomo-winvm 'py -V:3.13 C:\Users\USER\mst\win_matrix.py C:\Users\USER\mst\mihomo_speedtest.py'
 ```
 
 `win_interrupt.py` starts the speed test in its own console, stops it at the second server (Ctrl+C, or

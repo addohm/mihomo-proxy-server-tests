@@ -122,8 +122,10 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   console window restores like Ctrl+C; output can't crash on characters the console encoding lacks.
   First runs on the VM (2026-10-16): discovery over Clash Verge Rev's pipe, API, log stream, `curl.exe`,
   ping, reports, restore and the encoding fix all work (details in CLAUDE.md). Ctrl+C and closing the
-  window restore everything (`testserver/win_interrupt.py`). Still to check: a TCP controller with a
-  secret, TUN on, the PyYAML paths, and the matrix (needs a Windows version of `matrix.py`).
+  window restore everything (`testserver/win_interrupt.py`). The Windows matrix
+  (`testserver/win_matrix.py`) passes 6 of 6. Still to check: TUN on at rest, and the PyYAML path for
+  failed servers. A TCP controller can't be switched on through the API (only at start-up); it's
+  covered by the Linux matrix.
 - **Tester setup made clear and generic: done 2026-10-16, as its own project, revtunnel**
   (`addohm/revtunnel`). After the first VM run, where the user couldn't tell what was going on or what to
   do, the user asked for guided steps that say what, why and **where** (PC / server), and for a tool that
