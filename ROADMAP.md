@@ -113,14 +113,23 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
   VPS, as with the test server today. Rejected for now: a second Discord bot (Discord is blocked in
   mainland China and would have to go through the mihomo under test), a job queue on the VPS, Tailscale,
   a GitHub Actions self-hosted runner (GitHub is unreliable from China).
-- To work out when this is scheduled:
-  - Windows side: built-in OpenSSH client + OpenSSH Server, kept up and reconnected automatically (service
-    or scheduled task with keepalives).
-  - VPS side: a dedicated user that may only hold the port forward (no shell); the forwarded port listens
-    on the VPS's localhost only.
-  - The tunnel must not depend on the mihomo under test: the VPS address goes DIRECT and is excluded from
-    TUN routing in that client's config (as `setup.sh` does for the SSH client's IP), so toggling TUN and
-    mode doesn't cut it. Tests still run detached and are polled from a log, as with the matrix.
+- Started 2026-10-16: `testserver/setup-windows.ps1` (PowerShell, as a fresh Windows 11 has no Python).
+  Not yet run on any Windows machine. What it does:
+  - installs OpenSSH client + server and Python 3 (winget, all users); sshd listens on 127.0.0.1 only
+    (reached only through the tunnel), keys only, PowerShell as the SSH shell; asks for the public keys
+    allowed to log in; no sleep on mains power;
+  - **turns off VPNs** (user's decision, 2026-10-16): disconnects Windows VPN connections and disables
+    VPN/TUN adapters, so the tunnel goes direct; for a mihomo client's TUN it tells the user to turn TUN
+    off in the client too. This replaces the earlier plan of excluding the VPS address from TUN routing;
+  - makes the PC's own tunnel key, **asks for the server address** (it can change: re-run, enter the new
+    one, Enter for the rest), shows the key plus the commands to run on the server, then starts a
+    scheduled task (SYSTEM, at startup) that keeps `ssh -R 127.0.0.1:PORT:127.0.0.1:22` up and retries
+    every 15 s; it checks the tunnel came up and shows `tunnel.log` if not;
+  - server side (printed commands): a user (`tunnel`) with no shell whose key is limited to
+    `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, and `ClientAliveInterval 15` so a dropped
+    tunnel frees its port quickly.
+- Still open:
+  - Tests still run detached and are polled from a log, as with the matrix.
   - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.
   - Safety: the agent may only run this project's script and tooling, updates come only from this repo,
     and the machine's subscription and config files are never sent out, as with the test server.

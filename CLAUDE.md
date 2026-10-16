@@ -62,7 +62,8 @@ mihomotest/
               estimate/counts
   report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
-testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server")
+testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
+              setup-windows.ps1 (Windows tester behind a reverse SSH tunnel, roadmap step 4)
 ROADMAP.md    planned work and every decision taken about it
 ```
 
@@ -171,6 +172,10 @@ options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN
   `reject with tcp reset` = refused; a local UDP drop shows as "operation not permitted"), and
   `tc … netem delay` on a `prio bands 4` band filtered by destination IP for slow starters. Always delete
   them afterwards (`nft delete table inet <name>`, `tc qdisc del dev eth0 root`).
+- **Windows tester** (roadmap step 4): `testserver/setup-windows.ps1` sets up a fresh Windows 11 PC (OpenSSH
+  server on 127.0.0.1, Python, VPNs off) and keeps a reverse tunnel to a server; reach it from that server
+  with `ssh -p PORT WINUSER@127.0.0.1`. Usage and the server-side commands: the script's header and
+  output. Keep it ASCII-only (Windows PowerShell 5.1 reads BOM-less files as ANSI). Not yet run anywhere.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
