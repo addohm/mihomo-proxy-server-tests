@@ -184,7 +184,7 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
   with `ssh -p PORT WINUSER@127.0.0.1`. The tunnel (SYSTEM scheduled task, `ssh -R` with 15 s keepalives)
   reconnects every 15 s, indefinitely by default or N attempts in a row (asked at setup; a connection
   that lasted a minute resets the count). Usage: `testserver/README.md` (workflow) and the script's header. Keep it ASCII-only (Windows
-  PowerShell 5.1 reads BOM-less files as ANSI). Not yet run on Windows.
+  PowerShell 5.1 reads BOM-less files as ANSI). First run on the VM 2026-10-16: tunnel works.
   - Server side: `testserver/tunnel-host.sh 'PC KEY' [PORT] [USER]` on any Linux server with OpenSSH (no
     mihomo needed; one port per PC, default 2222; a new key for a port replaces the old one). User
     `tunnel`: no shell, no password; key limited to `permitlisten="127.0.0.1:PORT"`; an sshd `Match User`
@@ -202,8 +202,10 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
     Windows auto sign-in and the client set to start at login (the tunnel task starts at boot, the
     client only at logon). Turning TUN off in the client before setup matters: the script disables
     adapters named Mihomo/Meta, which could get in the way when the client turns TUN on again.
-  - Claude's login key for the VM: `~/.ssh/mihomo-winvm` (to add as `mihomo-winvm` in `~/.ssh/config`,
-    `ProxyJump mihomo-testserver`, once the tunnel is up).
+  - The VM (in mainland China, Windows 11, user `addohm`, Python 3.15 without PyYAML) is reachable:
+    `ssh mihomo-winvm` (in `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump
+    mihomo-testserver`). Tunnel up since 2026-10-16 after the key-owner fix. Its mihomo client's TUN
+    adapter (`Meta`) was disabled by setup.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
