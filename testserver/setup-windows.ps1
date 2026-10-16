@@ -11,7 +11,9 @@ It asks for administrator rights, then:
   4. looks for VPN connections and VPN/TUN adapters and turns them off, so the tunnel goes direct
   5. makes this PC's own tunnel key and asks for the server's address
   6. shows the key and the commands to run on the server, then starts the tunnel: a scheduled task (as
-     SYSTEM, at startup) keeps "ssh -R 127.0.0.1:PORT:127.0.0.1:22" up and reconnects when it drops
+     SYSTEM, at startup) keeps "ssh -R 127.0.0.1:PORT:127.0.0.1:22" up. Keepalives every 15 s notice a
+     dead tunnel within a minute; it then reconnects every 15 s, either indefinitely (the default) or a
+     set number of times in a row before giving up until the next restart or re-run
 
 Safe to re-run; previous answers are the defaults. The server address can change: re-run, enter the new
 address, press Enter for the rest. Files: C:\ProgramData\mihomo-tester (key, settings, tunnel.log).
@@ -135,11 +137,13 @@ if (-not (Test-Path $Key)) {
     if ($p.ExitCode -ne 0) { throw 'ssh-keygen failed' }
 }
 $c = if (Test-Path $Conf) { Get-Content $Conf -Raw | ConvertFrom-Json }
-     else { [pscustomobject]@{ Host = ''; Port = 22; User = 'tunnel'; RemotePort = 2222 } }
+     else { [pscustomobject]@{ Host = ''; Port = 22; User = 'tunnel'; RemotePort = 2222; Retries = 0 } }
 do { $c.Host = (Ask 'Server address (IP or host name)' $c.Host).Trim('[', ']') } until ($c.Host)
 $c.Port = [int](Ask 'Server SSH port' $c.Port)
 $c.User = Ask 'User on the server' $c.User
 $c.RemotePort = [int](Ask 'Port on the server that leads to this PC' $c.RemotePort)
+$retries = if ($null -ne $c.Retries) { $c.Retries } else { 0 }
+$c | Add-Member -Force Retries ([int](Ask 'Reconnect attempts before giving up (0 = keep the tunnel open indefinitely)' $retries))
 $c | ConvertTo-Json | Set-Content -Path $Conf -Encoding ascii
 
 $pub = (Get-Content "$Key.pub" -Raw).Trim()
@@ -168,16 +172,26 @@ Set-Content -Path $Loop -Encoding ascii -Value @'
 # Written by setup-windows.ps1; run as SYSTEM by the "mihomo-tester tunnel" task. Keeps the tunnel up.
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Log = "$Dir\tunnel.log"
+$fails = 0
 while ($true) {
     $c = Get-Content "$Dir\tunnel.json" -Raw | ConvertFrom-Json
     if ((Test-Path $Log) -and (Get-Item $Log).Length -gt 1MB) { Move-Item -Force $Log "$Log.old" }
     Add-Content $Log "$(Get-Date -Format s) connecting to $($c.User)@$($c.Host) port $($c.Port)"
+    $start = Get-Date
     & "$env:SystemRoot\System32\OpenSSH\ssh.exe" -N -E $Log -i "$Dir\id_ed25519" -p $c.Port `
         -o BatchMode=yes -o IdentitiesOnly=yes -o ExitOnForwardFailure=yes -o LogLevel=VERBOSE `
         -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 `
         -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$Dir\known_hosts" `
         -R "127.0.0.1:$($c.RemotePort):127.0.0.1:22" "$($c.User)@$($c.Host)"
-    Add-Content $Log "$(Get-Date -Format s) disconnected (exit $LASTEXITCODE); retrying in 15 s"
+    $code = $LASTEXITCODE
+    if (((Get-Date) - $start).TotalSeconds -ge 60) { $fails = 0 }  # it was up: count failures afresh
+    $fails++
+    if ($c.Retries -gt 0 -and $fails -gt $c.Retries) {
+        Add-Content $Log "$(Get-Date -Format s) disconnected (exit $code); gave up after $($c.Retries) attempts (restart the PC or re-run setup)"
+        exit 0
+    }
+    $of = if ($c.Retries -gt 0) { " of $($c.Retries)" } else { '' }
+    Add-Content $Log "$(Get-Date -Format s) disconnected (exit $code); reconnecting in 15 s (attempt $fails$of)"
     Start-Sleep 15
 }
 '@
@@ -204,7 +218,7 @@ if (Test-Path $Log) { $out = Get-Content $Log -Raw }
 if ($out -match 'Authenticated to' -and $out -notmatch 'disconnected \(exit') {
     Write-Host "Tunnel is up. From the server: ssh -p $($c.RemotePort) $env:USERNAME@127.0.0.1" -ForegroundColor Green
 } else {
-    Write-Host 'The tunnel did not come up; it keeps retrying every 15 s. Last lines of the log:' -ForegroundColor Yellow
+    Write-Host 'The tunnel did not come up yet; it retries every 15 s (as set above). Last lines of the log:' -ForegroundColor Yellow
     if (Test-Path $Log) { Get-Content $Log -Tail 15 }
     Write-Host "Log: $Log   Re-run this script to change the address."
 }

@@ -123,8 +123,11 @@ Order decided 2026-10-16: `--trace` waits until the China tester and the Windows
     off in the client too. This replaces the earlier plan of excluding the VPS address from TUN routing;
   - makes the PC's own tunnel key, **asks for the server address** (it can change: re-run, enter the new
     one, Enter for the rest), shows the key plus the commands to run on the server, then starts a
-    scheduled task (SYSTEM, at startup) that keeps `ssh -R 127.0.0.1:PORT:127.0.0.1:22` up and retries
-    every 15 s; it checks the tunnel came up and shows `tunnel.log` if not;
+    scheduled task (SYSTEM, at startup) that keeps `ssh -R 127.0.0.1:PORT:127.0.0.1:22` up: keepalives
+    every 15 s notice a dead tunnel within a minute, then it reconnects every 15 s, **indefinitely by
+    default or a chosen number of attempts in a row** (asked at setup; a connection that lasted a minute
+    resets the count; user's request, 2026-10-16); setup checks the tunnel came up and shows
+    `tunnel.log` if not;
   - server side (printed commands): a user (`tunnel`) with no shell whose key is limited to
     `restrict,port-forwarding,permitlisten="127.0.0.1:PORT"`, and `ClientAliveInterval 15` so a dropped
     tunnel frees its port quickly.
