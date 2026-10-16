@@ -1,15 +1,17 @@
 # mihomo-proxy-server-tests
 
 `mihomo_speedtest.py` tests every server in your **running** mihomo, exactly as mihomo uses it:
-connection time and download/upload speed through mihomo, and ping to the address it actually dialed. For servers that don't
-work it shows why: mihomo's own error (e.g. "connection timed out", "config error") plus a direct check of
-the server's port (blocked, refused, or reachable). It also flags servers that are slow to start. Works with
-any mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with
+connection time and download/upload speed through mihomo, and ping to the address it actually dialed, each
+with its jitter. For servers that don't work it shows why: mihomo's own error (e.g. "connection timed out",
+"config error") plus a direct check of the server's port (blocked, refused, or reachable). It also flags
+servers that are slow to start, tests disturbed by other apps' traffic, and servers behind Cloudflare's CDN
+(whose ping shows the CDN, not the server). Works with any mihomo-based client (Clash Verge Rev, Mihomo Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with
 servers listed in the config or loaded from proxy providers.
 
 ```bash
 python3 mihomo_speedtest.py                      # test everything
 python3 mihomo_speedtest.py --filter "Japan"     # only matching servers
+python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fast servers/connections
 ```
 
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
@@ -26,7 +28,6 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 - **Down / Up Mbps**: speed of the transfer itself, without connection setup (that's in Conn ms). On very
   fast servers a 10 MB transfer can finish too quickly to time reliably; the Note then says so. Run again
   with a larger `--size` (e.g. `--size 50`) for an accurate figure.
-
 
 | Result | Meaning |
 |---|---|

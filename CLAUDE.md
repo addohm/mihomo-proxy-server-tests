@@ -4,7 +4,8 @@
 Markdown + CSV report. The launcher only starts `mihomotest/cli.py`; the code lives in the `mihomotest/`
 package. `context.md` is the original handoff (2026-10-09), kept as a frozen snapshot for background; this
 file is the living summary. Keep this file, README, ROADMAP and the CLI docstring (`mihomotest/cli.py`, also
-the `--help` text) in sync when behaviour or options change.
+the `--help` text) in sync when behaviour or options change, in the same commit. At every milestone (e.g. a
+roadmap step done) also read all of them end to end and fix anything stale (user's rule, 2026-10-16).
 
 ## Hard rules
 
@@ -41,7 +42,8 @@ python3 mihomo_speedtest.py                                # everything, no prom
 python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 ```
 
-Options: `--filter REGEX`, `--size MB` (default 10; upload is half), `--timeout SEC` (25) — both must be > 0,
+Options: `--filter REGEX`, `--size MB` (default 10; upload is half; the only way to change the transfer
+size), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
 `--out DIR` (default: next to the script).
 
@@ -53,10 +55,12 @@ mihomotest/
   system.py   OS flags, run() (commands without a shell), prereqs() list
   mihomo.py   Controller (API, incl. streams), find_controller, MihomoState (test mode + restore),
               list_servers, LogWatcher (mihomo's log), config_servers (address/port from config +
-              provider files), DNS, connections
-  tests.py    curl, ping, tcp_check, test_server, failure cause (dial_error, classify, CAUSES),
-              run_tests (the run loop) + estimate/counts
-  report.py   cells/notes formatting, save_reports (Markdown + CSV)
+              provider files), DNS, connections (remote_ip, traffic_total)
+  tests.py    curl (timings), mbps (transfer-only speed), jitter, ping, tcp_check, cloudflare (CDN
+              ranges), test_server (warm-up, connection probes, transfers, other traffic), failure
+              cause (dial_error, classify, CAUSES), run_tests (the run loop, end-of-run pings) +
+              estimate/counts
+  report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server")
 ROADMAP.md    planned work and every decision taken about it
@@ -178,8 +182,8 @@ user says so.
 - **Windows** paths (`curl.exe`, named-pipe API, localised `ping` parsing — now also the per-reply times for jitter — `Get-CimInstance` discovery) have
   never run. A Windows 11 VM is available for this. **macOS** paths have never run and no Mac is available
   (GitHub Actions runners are the plan; see ROADMAP).
-- Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`) are first choices; tune
-  them after real runs on desktop clients.
+- Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
+  first choices; tune them after real runs on desktop clients.
 - Only the test server has run the code: full runs of all 45 servers on 2026-10-16 before and after step 3
   (42 ok both times, restore verified; ~5.5 → ~8 min with the connection probes), and the matrix. No run on a real desktop client since the package
   split.

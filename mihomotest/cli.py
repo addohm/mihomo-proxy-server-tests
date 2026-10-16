@@ -23,7 +23,8 @@ While the test runs, traffic that goes through mihomo uses the server under test
 
 Optional arguments
   --filter REGEX   only test servers whose name matches
-  --size MB        download size per server (upload is half). Default 10
+  --size MB        download size per server (upload is half). Default 10. Raise it
+                   (e.g. 50) when the Note says a transfer was too quick to time
   --api ADDR       controller address if it is not found automatically
                    (127.0.0.1:9090, unix:/path/to.sock or \\\\.\\pipe\\name)
   --secret TEXT    controller secret (or set MIHOMO_SECRET; asked for if needed)
@@ -176,7 +177,8 @@ def main():
     ap = argparse.ArgumentParser(prog="mihomo_speedtest.py", description="Test every server in your running mihomo.",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
     ap.add_argument("--filter", help="only test servers whose name matches this regex")
-    ap.add_argument("--size", type=positive(float), default=10, help="download MB per server (upload is half). Default 10")
+    ap.add_argument("--size", type=positive(float), default=10, help="download MB per server (upload is half). Default 10; raise it when "
+                    "the Note says a transfer was too quick to time")
     ap.add_argument("--timeout", type=positive(int), default=25, help="max seconds per transfer. Default 25")
     ap.add_argument("--api", help="controller address, if not found automatically")
     ap.add_argument("--secret", default="", help="controller secret (or MIHOMO_SECRET)")
