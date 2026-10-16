@@ -97,3 +97,26 @@ nothing here is started until the user says so. Done items are removed (see git 
   second local mihomo as a stand-in "server" (no subscription needed) and runs the script's real platform
   paths (discovery, named pipe, ping parsing, curl, restore).
 - A Windows 11 VM is available (2026-10-15) for testing the Windows paths by hand.
+
+## Remote tester inside China (added 2026-10-16, not scheduled)
+
+- Goal: a Windows machine in mainland China, behind a dynamic IP (no inbound SSH), that receives our changes,
+  runs the script (and later the matrix / packaged builds) against a real desktop client there, and reports
+  the results back. This covers what the US test server can't: Chinese networks, GFW behaviour, the
+  China-only paths (e.g. hop owners via mihomo's DNS in step 4) and Windows.
+- Decided (2026-10-16): **reverse SSH tunnel**. The China machine keeps an outbound SSH connection to our
+  test VPS with a remote forward (`ssh -R`) to its own SSH server; we reach it with plain SSH through the
+  VPS, as with the test server today. Rejected for now: a second Discord bot (Discord is blocked in
+  mainland China and would have to go through the mihomo under test), a job queue on the VPS, Tailscale,
+  a GitHub Actions self-hosted runner (GitHub is unreliable from China).
+- To work out when this is scheduled:
+  - Windows side: built-in OpenSSH client + OpenSSH Server, kept up and reconnected automatically (service
+    or scheduled task with keepalives).
+  - VPS side: a dedicated user that may only hold the port forward (no shell); the forwarded port listens
+    on the VPS's localhost only.
+  - The tunnel must not depend on the mihomo under test: the VPS address goes DIRECT and is excluded from
+    TUN routing in that client's config (as `setup.sh` does for the SSH client's IP), so toggling TUN and
+    mode doesn't cut it. Tests still run detached and are polled from a log, as with the matrix.
+  - SSH from China to a foreign VPS can be throttled at times; check how stable it is before relying on it.
+  - Safety: the agent may only run this project's script and tooling, updates come only from this repo,
+    and the machine's subscription and config files are never sent out, as with the test server.
