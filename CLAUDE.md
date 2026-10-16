@@ -194,8 +194,10 @@ also prepares it for a tester PC's tunnel via `tunnel-host.sh`, copied next to i
     port). Verified on the test server: own port works; other ports, 0.0.0.0, `-L` and shell refused; root's
     sshd settings unchanged. The test server has the user (no keys yet). VM port: 2222.
   - PC side, checked by review (2026-10-16; parsed with PowerShell 7, tunnel `ssh` options run against
-    the test server, not yet run on Windows): the tunnel key's ACL is reset to SYSTEM + Administrators
-    (ssh.exe as SYSTEM refuses a key the setup user can also read); `known_hosts` is cleared on each run
+    the test server, not yet run on Windows): the tunnel key's owner is set to Administrators and its ACL
+    reset to SYSTEM + Administrators (ssh.exe as SYSTEM refuses a key owned or readable by the setup user —
+    seen on the VM: auth never offered the key); ssh's log goes through `cmd /c … 2>>` (`ssh -E` locks
+    the file, so setup couldn't read it); PyYAML from wheels only (none yet for a brand-new Python); `known_hosts` is cleared on each run
     so a rebuilt server is trusted again; PyYAML is installed. For unattended use the PC also needs
     Windows auto sign-in and the client set to start at login (the tunnel task starts at boot, the
     client only at logon). Turning TUN off in the client before setup matters: the script disables

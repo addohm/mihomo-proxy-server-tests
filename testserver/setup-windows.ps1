@@ -45,6 +45,13 @@ function Ask($question, $default) {
     if ($a) { $a.Trim() } else { "$default" }
 }
 
+function Read-Log {
+    # cmd.exe keeps the log open while ssh runs, so open it with sharing (Get-Content can't)
+    if (-not (Test-Path $Log)) { return '' }
+    $f = [IO.File]::Open($Log, 'Open', 'Read', 'ReadWrite')
+    try { (New-Object IO.StreamReader $f).ReadToEnd() } finally { $f.Close() }
+}
+
 function Stop-Tunnel {
     try { Stop-ScheduledTask -TaskName $Task -ErrorAction SilentlyContinue } catch {}
     Get-CimInstance Win32_Process -Filter "Name='ssh.exe'" |
@@ -86,6 +93,7 @@ while ($true) {
     Add-Content -Path $authKeys -Value $pub -Encoding ascii
 }
 if (Test-Path $authKeys) {
+    icacls $authKeys /setowner $Admins | Out-Null  # sshd wants it owned by Administrators or SYSTEM
     icacls $authKeys /inheritance:r /grant:r "${System}:F" "${Admins}:F" | Out-Null
     Write-Host "    $(@(Get-Content $authKeys | Where-Object { $_.Trim() }).Count) key(s) may log in"
 } else {
@@ -103,8 +111,10 @@ if (-not (Test-Python) -and (Get-Command winget.exe -ErrorAction SilentlyContinu
 }
 if (Test-Python) {
     # PyYAML lets the speed test read the controller secret from the client's config (no prompt over SSH)
-    & py.exe -3 -m pip install --quiet --disable-pip-version-check pyyaml
-    Write-Host "    $(& py.exe -3 --version), PyYAML"
+    # wheels only: a brand-new Python may have no PyYAML wheel yet, and building one needs a C compiler
+    & py.exe -3 -m pip install --quiet --disable-pip-version-check --only-binary :all: pyyaml
+    if ($LASTEXITCODE -eq 0) { Write-Host "    $(& py.exe -3 --version), PyYAML" }
+    else { Write-Host "    $(& py.exe -3 --version); no PyYAML for it yet (optional: the secret may be asked for)" }
 }
 else { Write-Host '    Warning: no Python. Install Python 3 from python.org for all users.' -ForegroundColor Yellow }
 
@@ -141,8 +151,10 @@ if (-not (Test-Path $Key)) {
         -ArgumentList "-q -t ed25519 -N `"`" -C mihomo-tester-$env:COMPUTERNAME -f `"$Key`""
     if ($p.ExitCode -ne 0) { throw 'ssh-keygen failed' }
 }
-# ssh-keygen gives the key an explicit entry for the user running this; ssh.exe running as SYSTEM refuses a
-# key that any other account can read, so reset it to the folder's SYSTEM + Administrators access
+# ssh-keygen makes the user running this the key's owner and gives them access; ssh.exe running as SYSTEM
+# refuses a key owned by or readable by another account, so hand it to Administrators and reset it to the
+# folder's SYSTEM + Administrators access
+icacls $Key /setowner $Admins | Out-Null
 icacls $Key /reset | Out-Null
 icacls "$Key.pub" /reset | Out-Null
 # trust the server's host key afresh at the next connect (the server or its address may have changed)
@@ -180,11 +192,13 @@ while ($true) {
     if ((Test-Path $Log) -and (Get-Item $Log).Length -gt 1MB) { Move-Item -Force $Log "$Log.old" }
     Add-Content $Log "$(Get-Date -Format s) connecting to $($c.User)@$($c.Host) port $($c.Port)"
     $start = Get-Date
-    & "$env:SystemRoot\System32\OpenSSH\ssh.exe" -N -E $Log -i "$Dir\id_ed25519" -p $c.Port `
-        -o BatchMode=yes -o IdentitiesOnly=yes -o ExitOnForwardFailure=yes -o LogLevel=VERBOSE `
-        -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 `
-        -o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=$Dir\known_hosts" `
-        -R "127.0.0.1:$($c.RemotePort):127.0.0.1:22" "$($c.User)@$($c.Host)"
+    # ssh's messages go to the log through cmd.exe, which lets others read the file meanwhile ("ssh -E"
+    # locks it). No paths here contain spaces or quotes, so plain words are safe on cmd's command line.
+    cmd.exe /c ("$env:SystemRoot\System32\OpenSSH\ssh.exe -N -i $Dir\id_ed25519 -p $($c.Port) " +
+        '-o BatchMode=yes -o IdentitiesOnly=yes -o ExitOnForwardFailure=yes -o LogLevel=VERBOSE ' +
+        '-o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 ' +
+        "-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$Dir\known_hosts " +
+        "-R 127.0.0.1:$($c.RemotePort):127.0.0.1:22 $($c.User)@$($c.Host) 2>>$Log")
     $code = $LASTEXITCODE
     if (((Get-Date) - $start).TotalSeconds -ge 60) { $fails = 0 }  # it was up: count failures afresh
     $fails++
@@ -213,14 +227,14 @@ Write-Host 'Connecting...'
 $out = ''
 for ($i = 0; $i -lt 30 -and $out -notmatch 'Authenticated to|disconnected \(exit'; $i++) {
     Start-Sleep 1
-    if (Test-Path $Log) { $out = Get-Content $Log -Raw }
+    $out = Read-Log
 }
 Start-Sleep 3  # a refused port forward ends the session right after authentication
-if (Test-Path $Log) { $out = Get-Content $Log -Raw }
+$out = Read-Log
 if ($out -match 'Authenticated to' -and $out -notmatch 'disconnected \(exit') {
     Write-Host "Tunnel is up. From the server: ssh -p $($c.RemotePort) $env:USERNAME@127.0.0.1" -ForegroundColor Green
 } else {
     Write-Host 'The tunnel did not come up yet; it retries every 15 s (as set above). Last lines of the log:' -ForegroundColor Yellow
-    if (Test-Path $Log) { Get-Content $Log -Tail 15 }
+    (Read-Log) -split "`r?`n" | Select-Object -Last 15
     Write-Host "Log: $Log   Re-run this script to change the address."
 }
