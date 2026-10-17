@@ -37,8 +37,8 @@ Optional arguments
                    given report .csv): servers that stopped working or work again, big
                    changes (over 30%) in speed, Conn ms or ping, new and removed servers
   --trace          for servers that didn't work, show where the path stops and who owns
-                   each hop: a path trace for "failed" servers, a TCP trace to the port for
-                   "unreachable" ones (Linux, run with sudo). Hop addresses are looked up
+                   each hop: a path trace for servers that don't answer ping, a TCP trace to
+                   the port for those that do (Linux, run with sudo). Hop addresses are looked up
                    with Team Cymru's ASN service (through mihomo's DNS, else whois.cymru.com).
 """
 import argparse
@@ -56,10 +56,10 @@ import time
 import unicodedata
 
 from .mihomo import STOP_SIGNALS, MihomoError, SecretNeeded, find_controller, list_servers
-from .report import (BASELINE, HEADERS, LEGEND, cells, compare, comparison_lines, load_report, mmss, notes,
+from .report import (BASELINE, HEADERS, LEGEND, cells, compare, comparison_lines, load_report, mmss, notes, summary,
                      reports_dir, save_reports)
 from .system import IS_WIN, prereqs
-from .tests import counts, run_tests
+from .tests import RESULTS, counts, run_tests
 
 if IS_WIN:
     os.system("")  # enable ANSI colours in Windows terminals
@@ -156,7 +156,7 @@ def print_table(results):
     for i, r in enumerate(results, 1):
         vals = cells(i, r)
         line = " ".join(fit(v, w, rt) for v, (w, rt) in zip(vals[:-1], WIDTHS[:-1]))
-        colour = {"ok": ok, "partial": warn, "unreachable": warn}.get(r["result"], bad)
+        colour = {"ok": ok, "partial": warn, "blocked": warn, "refused": warn, "rejected": warn}.get(r["result"], bad)
         print(f"{line} {colour(fit(r['result'], WIDTHS[-1][0]))}" + (dim(f" {r['note']}") if r["note"] else ""))
 
 
@@ -276,18 +276,20 @@ def main():
     print_table(results)
     n = counts(results)
     runtime = mmss(time.time() - t0)
-    print(f"\n{ok(n['ok'])} ok, {warn(n['partial'])} partial, {warn(n['unreachable'])} unreachable, "
-          f"{bad(n['failed'])} failed of {len(results)} "
-          f"servers in {runtime}")
-    print(dim(textwrap.fill(LEGEND, min(shutil.get_terminal_size((100, 20)).columns - 1, 110))))
-    for note in notes(n):
-        print(warn("\n" + note))
+    print(f"\n{bold(summary(n, len(results)))} in {runtime}")
+    wrap = min(shutil.get_terminal_size((100, 20)).columns - 1, 110)
+    print(dim(textwrap.fill(LEGEND, wrap)))
+    meanings = notes(n, RESULTS)
+    if meanings:
+        print("\nWhat the results mean:")
+        for note in meanings:
+            print(warn(textwrap.fill(note, wrap, initial_indent="  ", subsequent_indent="    ")))
     fast = [r for r in results if r["down"]]
     if fast:
         b = max(fast, key=lambda r: r["down"])
         print(f"Fastest download: {bold(b['name'])} ({b['down']:.1f} Mbps)")
     meta = {"date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "version": version, "api": str(ctl),
-            "size": args.size, "runtime": runtime, "total": len(results), **n}
+            "size": args.size, "runtime": runtime, "total": len(results), "counts": n, "meanings": RESULTS}
     comparison = None
     if base:
         comparison = comparison_lines(compare(results, base[2], names_now), base[1], base[0], meta["date"])

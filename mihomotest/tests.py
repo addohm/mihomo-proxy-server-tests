@@ -18,7 +18,26 @@ from .system import CURL, IS_MAC, IS_WIN, NULL_DEV, run
 PROBE_URL = "http://www.gstatic.com/generate_204"
 DOWN_URL = "https://speed.cloudflare.com/__down?bytes={n}"
 UP_URL = "https://speed.cloudflare.com/__up"
-RESULTS = ("ok", "partial", "unreachable", "failed")
+# result labels, in report order, with what each means (shown once under the table when it appears)
+RESULTS = {
+    "ok": "",
+    "partial": "one of download / upload didn't work; the Note says which and why.",
+    "blocked": "the server answers ping, but its port gets no answer, through mihomo and directly: most likely "
+               "blocked on your network.",
+    "refused": "the server's port refuses connections: its proxy service is down, or the port is wrong.",
+    "rejected": "the server's port is reachable, but the proxy connection itself fails: wrong or expired "
+                "credentials, a TLS/certificate problem, or the protocol is interfered with.",
+    "no answer": "neither ping nor the port answers: the server may be down, or everything to it is blocked "
+                 "(some servers also ignore ping).",
+    "no route": "there's no route to the server's address from here (e.g. an IPv6 server on an IPv4-only "
+                "connection).",
+    "bad config": "mihomo says the server's entry in your profile is invalid.",
+    "DNS failed": "the server's name doesn't resolve.",
+    "firewall": "a firewall on this computer blocked the connection.",
+    "no selector": "no proxy group lets mihomo select this server, so it can't be tested.",
+    "failed": "it didn't work, and the checks can't tell why (see the Note).",
+}
+WORKING = ("ok", "partial")
 SLOW_START = 3  # seconds to the first response through a newly selected server before it's flagged
 UDP_TYPES = {"hysteria", "hysteria2", "tuic", "wireguard"}  # no TCP port to check directly
 PROBES = 5  # new connections through each working server, for Conn ms and its jitter
@@ -174,6 +193,7 @@ def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
     if not state.select(srv):
         r["result"], r["note"] = "failed", ("mihomo would not select this server" if srv.get("path")
                                             else "no selector group contains this server, so it can't be selected")
+        r["unselectable"] = not srv.get("path")
         return r
     # warm-up: the first connection through a newly selected server can take a few seconds
     t0 = time.time()
@@ -260,6 +280,33 @@ def estimate(count, size):
     return count * (6 + 1.4 * size)
 
 
+def result_label(r):
+    """The final result of a server, from what the test found: mihomo's error, the direct port check and
+    whether its address answers ping (see RESULTS)."""
+    if r["result"] in WORKING:
+        return r["result"]
+    if r.get("unselectable"):
+        return "no selector"
+    cause, check, pings = classify(r["error"]) if r["error"] else "", r["check"], r["ping"] is not None
+    if cause.startswith("config error"):
+        return "bad config"
+    if cause.startswith("server name"):
+        return "DNS failed"
+    if cause.startswith("blocked by a firewall"):
+        return "firewall"
+    if check.endswith("no route") or cause.startswith("no route"):
+        return "no route"
+    if check.endswith("refused") or cause == "server refused the connection":
+        return "refused"
+    if check.endswith("open") or cause.startswith(("server rejected", "TLS")):
+        return "rejected"
+    if check.endswith("no answer"):
+        return "blocked" if pings else "no answer"
+    if not pings and r["loss"] == 100:  # pinged, no reply, and no port check (e.g. UDP)
+        return "no answer"
+    return "failed"
+
+
 def counts(results):
     return {k: sum(r["result"] == k for r in results) for k in RESULTS}
 
@@ -273,18 +320,18 @@ def other_traffic(ctl, seconds=2):
 
 
 def run_traces(ctl, results, targets, conf, pool, emit):
-    """--trace: a path trace for "failed" servers, a TCP trace to the proxy port for "unreachable" ones (ping
-    already gets through there), then the network owner of every hop and server address. Summary in the Note
+    """--trace: a path trace for servers that didn't work and don't answer ping, a TCP trace to the proxy port
+    for those that do (ping already gets through there), then the network owner of every hop and server address. Summary in the Note
     and r["trace"], whole trace in r["trace_hops"]; servers on a known CDN (by owner) get a CDN note."""
     jobs = {}
     for r in results:
         ip = targets.get(r["name"])
-        if r["result"] == "failed" and ip:
+        if r["result"] not in WORKING and r["ping"] is None and ip:
             if r["check"].endswith("no route"):  # nowhere to trace to (e.g. an IPv6 server, no IPv6 here)
                 r["trace"] = "not traced: no route to the server"
             else:
                 jobs[r["name"]] = pool.submit(tracing.trace, ip)
-        elif r["result"] == "unreachable" and ip:
+        elif r["result"] not in WORKING and ip:
             port = (conf.get(r["name"]) or {}).get("port")
             if r["type"] in UDP_TYPES:
                 r["trace"] = "port trace: not possible (UDP)"
@@ -394,5 +441,7 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False):
             f.cancel()  # when stopped, don't wait for queued pings/checks at exit
         pinger.shutdown(wait=False)
         shutil.rmtree(tmp, ignore_errors=True)
+    for r in results:  # also after Ctrl+C: label with whatever was found
+        r["result"] = result_label(r)
     emit("restored", {"state": state})
     return results, stopped

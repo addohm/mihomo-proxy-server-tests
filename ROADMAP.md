@@ -15,7 +15,7 @@ nothing here is started until the user says so. Done items are removed (see git 
    Rev, Clash Party, FlClash, Clash Nyanpasu, plain mihomo)
 6. ~~`--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)~~ — done 2026-10-17
 7. ~~Per-user reports folder + baseline / `--compare`~~ — done 2026-10-17
-8. Clearer result labels
+8. ~~Clearer result labels~~ — done 2026-10-17
 9. GUI (local web page)
 10. Packaging + releases
 
@@ -30,8 +30,9 @@ Verge Rev's DNS, "not available on Windows" for port traces). Also: servers whos
 route" aren't traced; a trace that runs out of hops says so instead of "stops". GUI (per-server button) is
 step 9.
 
-- An ICMP trace is useless for "unreachable" servers (ICMP already gets through); they need a TCP trace to
-  the proxy port. An ICMP trace is still useful for "failed" servers.
+- An ICMP trace is useless for servers that answer ping (ICMP already gets through; now `blocked` /
+  `refused` / `rejected`); they need a TCP trace to the proxy port. An ICMP trace is still useful for those
+  that don't (`no answer`).
 - Decided: off by default; `--trace` traces every failed server automatically. GUI later: a per-server
   "trace this server" button plus a setting to trace automatically.
 - Tools without root: `tracepath` (Linux), `traceroute` (macOS), `tracert` (Windows); limits ~20 hops, short
@@ -72,9 +73,12 @@ since a filtered baseline can't tell the two apart; small swings need at least 2
 
 ## 8. Clearer result labels
 
-- The user wants clearer answers than ok / partial / unreachable / failed. Every failure now has a cause
-  (mihomo's error) and a direct check, so labels like "blocked", "refused", "config error" can be derived;
-  step 3 is done, so this can be revisited.
+- The user wanted clearer answers than ok / partial / unreachable / failed. Every failure has a cause
+  (mihomo's error) and a direct check, so the label is derived from those plus the ping.
+- Done 2026-10-17 (proposed and agreed with the user): `ok`, `partial`, `blocked` (pings, port no answer),
+  `refused`, `rejected` (port open, connection fails), `no answer` (neither), `no route`, `bad config`,
+  `DNS failed`, `firewall`, `no selector`, fallback `failed`; one plain sentence under the table for each
+  label that appears; summary "N ok, N blocked, … of N servers". Details in CLAUDE.md, "How it works" 7.
 
 ## 9–10. GUI and packaging (decided 2026-10-15)
 

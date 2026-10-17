@@ -5,12 +5,6 @@ import os
 import re
 import tempfile
 
-UNREACHABLE_NOTE = ("Note: 'unreachable' does NOT mean the server is down. It answers ping, but mihomo could "
-                    "not get a working proxy connection through it from this network. Common causes: the port or "
-                    "protocol is blocked on your connection, or the server refused the connection (expired "
-                    "subscription, wrong password, changed server settings).")
-FAILED_NOTE = ("Note: 'failed' servers did not answer ping either (or their address could not be found). "
-               "They may be down, or they may simply block ping.")
 
 LEGEND = ("Conn ms: time to the first response over a new connection through the server (median of 5). "
           "Ping ms: direct ping to the server's address (10 pings, after all transfers). "
@@ -22,7 +16,7 @@ HEADERS = ["#", "Server", "Type", "Conn ms", "Ping ms", "Loss %", "Down Mbps", "
 BASELINE = "baseline.csv"
 SWING = 0.30  # a change counts as big above 30 %, and only when it's also at least:
 SWING_MIN = {"download_mbps": 2, "upload_mbps": 2, "conn_ms": 20, "ping_ms": 20}
-WORKING = ("ok", "partial")
+WORKING = ("ok", "partial")  # also how older reports' unreachable / failed compare: as not working
 
 
 def reports_dir():
@@ -65,9 +59,15 @@ def cells(i, r):
             r["result"]]
 
 
-def notes(n):
-    """Explanatory notes that apply, given result counts."""
-    return ([UNREACHABLE_NOTE] if n["unreachable"] else []) + ([FAILED_NOTE] if n["failed"] else [])
+def notes(n, meanings):
+    """One explanation per result label that appears (n: label -> count, meanings: label -> text)."""
+    return [f"{label}: {meanings[label]}" for label, k in n.items() if k and meanings.get(label)]
+
+
+def summary(n, total):
+    """'25 ok, 14 blocked, 2 no answer of 43 servers' (ok always first, other labels only when present)."""
+    parts = [f"{n.get('ok', 0)} ok"] + [f"{k} {label}" for label, k in n.items() if k and label != "ok"]
+    return f"{', '.join(parts)} of {total} servers"
 
 
 def load_report(path):
@@ -150,16 +150,15 @@ def save_reports(results, meta, out_dir, comparison=None):
              f"- Date: {meta['date']}", f"- mihomo: {meta['version']} ({meta['api']})",
              f"- Download size: {meta['size']:g} MB, upload {meta['size'] / 2:g} MB",
              f"- Speed method: {SPEED_METHOD} (transfer phase only, without connection setup)",
-             f"- Servers: {meta['total']}, ok: {meta['ok']}, partial: {meta['partial']}, "
-             f"unreachable: {meta['unreachable']}, failed: {meta['failed']}",
+             f"- Servers: {summary(meta['counts'], meta['total'])}",
              f"- Runtime: {meta['runtime']}", "",
              "| " + " | ".join(HEADERS + ["Note"]) + " |",
              "|---:|---|---|---:|---:|---:|---:|---:|---|---|"]
     for i, r in enumerate(results, 1):
         lines.append("| " + " | ".join(v.replace("|", "\\|") for v in cells(i, r) + [r["note"]]) + " |")
     lines += ["", f"> {LEGEND}"]
-    for note in notes(meta):
-        lines += ["", f"> {note}"]
+    for note in notes(meta["counts"], meta["meanings"]):
+        lines += ["", f"> **{note.split(':')[0]}**:{note.split(':', 1)[1]}"]
     if comparison:
         lines += ["", "## Changes since the saved report", "", comparison[0], ""]
         lines += [("- " + x[4:] if x.startswith("  - ") else f"**{x}**" if x.endswith(":") else x) for x in comparison[1:]]

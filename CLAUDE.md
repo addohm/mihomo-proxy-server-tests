@@ -92,7 +92,7 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    group's selection); turns TUN off, sets mode `global`; opens a temporary `mixed-port` only if there's no
    local proxy port. Right after `apply()`, `proxy_answers` (tests.py) sends one proxy handshake to that
    port: a paused core (FlClash when not started) accepts and drops it at once, and every server would look
-   unreachable, so the run stops with a `MihomoError` ("isn't passing connections … is your client
+   unusable, so the run stops with a `MihomoError` ("isn't passing connections … is your client
    started?"); a timeout counts as answering. `restore()` runs first in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK), before anything
    that could delay it (e.g. closing the log stream, which on a Windows pipe is done in a daemon thread
    because it can block), and puts every touched group back (inner groups first, `GLOBAL` last); those
@@ -147,9 +147,9 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      all of AWS).
    - Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C.
    - Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
-6b. **`--trace`** (`run_traces`, still in test mode with TUN off, after the pings): "failed" servers get a
-   path trace (`tracert -d` / `tracepath -n` / macOS `traceroute -n`, ≤ 20 hops), "unreachable" ones a TCP
-   trace to the proxy port (Linux as root with `traceroute -T` or `mtr --tcp`; otherwise the Note says
+6b. **`--trace`** (`run_traces`, still in test mode with TUN off, after the pings): servers that didn't work
+   and don't answer ping get a path trace (`tracert -d` / `tracepath -n` / macOS `traceroute -n`, ≤ 20 hops),
+   those that do answer ping a TCP trace to the proxy port (Linux as root with `traceroute -T` or `mtr --tcp`; otherwise the Note says
    "run with sudo", on Windows "not available"; UDP protocols: not possible); failed servers whose direct
    check says "no route" aren't traced. `parse_hops` reads every tool's output in any language (a line
    starting with the hop number, then the first IP). Owners: Team Cymru TXT records (`origin.asn` /
@@ -158,11 +158,17 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    GTT-BACKBONE)", "reaches the server (13 hops)", "no answer from the server within 20 hops; last hop: …");
    Markdown "Traces" section: the whole `hop_list` (runs of `*` collapsed); CSV `trace` column. Traces run
    in parallel in the ping pool: about 1 min extra. Hop addresses go to Team Cymru (documented).
-7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
-   Labels stay these four for now (clearer labels are roadmap step 8); the cause and the direct check go in
-   the Note (e.g. "connection timed out; direct check: port 43000 no answer"). `UNREACHABLE_NOTE` /
-   `FAILED_NOTE` are shown when relevant (terminal + Markdown): unreachable can also mean the server refused
-   the connection (expired/wrong credentials), and failed may just mean ICMP is blocked.
+7. Results (roadmap step 8): during the run a server that isn't ok/partial is "failed", or "unreachable" once
+   it's found to answer ping (internal only; `run_traces` uses `ping`, not these). After the run (also after
+   Ctrl+C) `result_label` gives the final label from the cause (`classify`), the direct check and the ping,
+   first match wins: `no selector` (no path), `bad config`, `DNS failed`, `firewall`, `no route` (check or
+   cause), `refused` (check or cause), `rejected` (port open, or credentials/TLS cause), `blocked` (port no
+   answer, address pings), `no answer` (port no answer, or no ping at all with 100 % loss), else `failed`.
+   `tests.RESULTS` holds the labels in order with one sentence each; `report.notes` shows the sentence for
+   each label that appears (terminal "What the results mean:", Markdown quotes); `report.summary` is "N ok,
+   N blocked, … of N servers" (ok always first; `matrix.py` parses `N ok … of N servers`). Colours: ok
+   green; partial / blocked / refused / rejected yellow (the server is there); the rest red. `--compare`
+   still counts only ok/partial as working, so older reports (unreachable/failed) compare fine.
 8. `save_reports`: `mihomo-speedtest-YYYYMMDD-HHMMSS.{md,csv}` (CSV has a UTF-8 BOM for Excel). The Markdown
    adds the speed method, a `LEGEND` and a "Failure details" section with mihomo's raw errors. Table cells
    show jitter as "182 ±12" (Conn ms, Ping ms); the CSV has separate `conn_ms`, `conn_jitter_ms`,
@@ -194,8 +200,8 @@ IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in
 `revtunnel-relay.sh`, copied next to it).
 
 - Access: the workspace's `/claude ssh` host, `/srv/claude/data/ssh/mihomo-proxy-server-tests/ssh sgp-vps
-  '...'` (root; also `scp -S <that ssh>`). x86_64, ~460 MB RAM, IPv4 only (the IPv6 test servers get "no
-  route"). Keep the IP out of the repo.
+  '...'` (root; also `scp -S <that ssh>`). x86_64, ~460 MB RAM, IPv4 + IPv6 (the IPv6 test servers work from
+  here; from the VM in China, which has no IPv6, they get `no route`). Keep the IP out of the repo.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials. Don't
   print provider/config files in tool output either.
 - `/etc/mihomo/config.default.yaml` is the default setup (subscription profile with the IPv6 servers'

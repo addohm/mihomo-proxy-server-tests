@@ -62,14 +62,14 @@ def run_variant(changes, args, ssh_ip, out_dir):
                        capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=900)
     after = snapshot(info)
     out = p.stdout + p.stderr
-    m = re.search(r"(\d+) ok, (\d+) partial, (\d+) unreachable, (\d+) failed of (\d+) servers", out)
+    m = re.search(r"(\d+) ok\b.*? of (\d+) servers", out)  # "2 ok, 1 blocked of 3 servers"
     checks = {"found": "Connected to mihomo" in out,
-              "tested": bool(m) and int(m[5]) == len(pick) and int(m[1]) >= 1,
+              "tested": bool(m) and int(m[2]) == len(pick) and int(m[1]) >= 1,
               "restored": before == after,
               "exit 0": p.returncode == 0}
     detail = "  ".join(f"{k} {'✔' if v else '✘'}" for k, v in checks.items())
     if m:
-        detail += f"   ({m[1]} ok of {m[5]})"
+        detail += f"   ({m[1]} ok of {m[2]})"
     if before != after:
         detail += "\n      before: " + str(before) + "\n      after:  " + str(after)
     return all(checks.values()), detail, out

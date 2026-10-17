@@ -43,12 +43,22 @@ at …" says which. Use `--api` to choose another (e.g. its pipe, `--api \\.\pip
   still measured from what arrived. On slow networks (e.g. from mainland China) use a smaller `--size`
   (e.g. `--size 2`) so transfers can finish, or a longer `--timeout`, which makes runs longer.
 
-| Result | Meaning |
-|---|---|
-| `ok` | download and upload both worked |
-| `partial` | one of them failed (the Note says which, and why) |
-| `unreachable` | no proxy connection, but the server answers ping — it is online; something between you and its proxy port (or the server itself) refused |
-| `failed` | no proxy connection and no ping reply — it may be down, or just block ping |
+| Result | What was found | What it usually means |
+|---|---|---|
+| `ok` | download and upload both worked | |
+| `partial` | one of them didn't | the Note says which, and why |
+| `blocked` | the address answers ping, its port gets no answer | the port is blocked on your network |
+| `refused` | the port refuses connections | the proxy service is down, or the port is wrong |
+| `rejected` | the port is reachable, the proxy connection fails | wrong or expired credentials, TLS/certificate, or the protocol is interfered with |
+| `no answer` | neither ping nor the port answers | the server is down, or everything to it is blocked (some ignore ping) |
+| `no route` | no route to the address | e.g. an IPv6 server on an IPv4-only connection |
+| `bad config` | mihomo says the entry is invalid | fix the server's entry in the profile |
+| `DNS failed` | the server's name doesn't resolve | the name is gone, or DNS is blocked |
+| `firewall` | a firewall on this computer blocked it | local security software |
+| `no selector` | no proxy group can select it | it can't be tested through mihomo |
+| `failed` | none of the above fits | see the Note (e.g. UDP protocols, which have no port check) |
+
+Under the table, the results that appear are explained in a sentence each.
 
 The **Note** column explains what went wrong, in two parts:
 
@@ -95,9 +105,10 @@ With `--trace`, after the test the script traces every server that didn't work a
 stops to the Note, with the network that owns that hop (e.g. "path trace: stops after hop 11: 141.136.111.46
 (AS3257 GTT-BACKBONE)"). The Markdown report lists every hop.
 
-- **failed** servers get a path trace (`tracert`, `tracepath` or `traceroute`).
-- **unreachable** servers answer ping, so a path trace would tell nothing; they get a trace to their proxy
-  port instead, which needs Linux and sudo (`sudo python3 mihomo_speedtest.py --trace`) with `traceroute` or
+- servers that **don't answer ping** (e.g. `no answer`) get a path trace (`tracert`, `tracepath` or
+  `traceroute`).
+- servers that **do** (e.g. `blocked`, `refused`, `rejected`) would tell nothing from a path trace; they get a
+  trace to their proxy port instead, which needs Linux and sudo (`sudo python3 mihomo_speedtest.py --trace`) with `traceroute` or
   `mtr` installed. "reaches the server" means the port is reachable and the problem is in the connection
   itself (e.g. credentials, TLS); "stops after hop N" shows where it's blocked.
 - Servers whose address belongs to a CDN such as Fastly or Akamai are labelled like Cloudflare ones.
@@ -109,7 +120,7 @@ stops to the Note, with the network that owns that hop (e.g. "path trace: stops 
 - **FlClash**: turn on *External controller* in its settings and press *Start*. Its controller has a
   secret the script can't read from FlClash's settings, so it asks for it (or pass `--secret`). If the
   client isn't started, the script stops with "mihomo isn't passing connections … is your client
-  started?" instead of reporting every server as unreachable.
+  started?" instead of reporting every server as not working.
 - **Clash Verge Rev**, **Clash Party**, **Clash Nyanpasu**: found on their own, no settings needed (Nyanpasu's
   controller secret is read from its config, which needs PyYAML; without it the script asks for it).
 
