@@ -88,7 +88,11 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
 1. `prereqs` / `check_prereqs`: Python 3.8+, curl (`curl.exe` on Windows), ping. PowerShell is optional
    (Windows process discovery only). External commands run directly via `run` (argv list, no shell).
 2. `find_controller`: process command line (`-ext-ctl`, `-ext-ctl-unix`, `-ext-ctl-pipe`, `-secret`) →
-   `external-controller*` / `secret` in `config_files()` → default ports/pipes. `Controller` speaks raw
+   `external-controller*` / `secret` in `config_files()` → Windows: `mihomo_pipes()`, every named pipe with
+   "mihomo" in its name (not `*-service`) → default ports/pipes. The pipe list matters: a **normal (not
+   elevated) user can't read the command line of a core run as a service** (Clash Verge Rev's service mode
+   runs `verge-mihomo.exe` as SYSTEM), so its `-ext-ctl-pipe` with the per-user id is invisible, but the
+   pipe list isn't and the pipe opens fine (found 2026-10-17 by the user; my SSH tests ran elevated). `Controller` speaks raw
    HTTP/1.0 over TCP, Unix socket or Windows named pipe (pipe I/O runs in a daemon thread so it can time
    out; opening a busy pipe is retried for up to 2 s); `Controller.stream` opens long-lived GETs such as
    `/logs`.
@@ -267,6 +271,12 @@ IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in
     the window: `testserver/win_interrupt.py` (starts the test in its own console, interrupts it, checks
     the restore). Processes started from an SSH session inherit "ignore Ctrl+C", so a plain
     `Start-Process` never sees a Ctrl+C. Put back any selection you change for a test.
+  - **Also test as a normal user**: `ssh mihomo-winvm` runs elevated and sees more than a user's own
+    PowerShell window (e.g. a service's command line). Run a check in the user's desktop session with a
+    normal token through a scheduled task: `New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType
+    Interactive -RunLevel Limited`, run once, wait while its State is Running, unregister; have the script
+    write its results to a file. (Don't name a PowerShell script parameter `$Args`: it's an automatic
+    variable, and the value silently disappears.)
   - Anything that may cut the tunnel (TUN on/off, long runs): start it detached with `Invoke-CimMethod
     Win32_Process -MethodName Create` (processes started normally die with the SSH session) and have it
     write a log with `Out-File -Encoding utf8`: Windows PowerShell's `>>` / `*>>` write UTF-16, which a

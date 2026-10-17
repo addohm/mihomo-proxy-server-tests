@@ -260,6 +260,20 @@ def config_files():
     return out
 
 
+def mihomo_pipes():
+    """Windows: named pipes with "mihomo" in their name (e.g. Clash Verge Rev's
+    verge-mihomo-production-<id>, Clash Party's MihomoParty\\mihomo-user-<user>-<n>). A normal user can't read
+    the command line of a core that runs as a service (Clash Verge Rev's service mode), so -ext-ctl-pipe isn't
+    visible there, but the list of pipes is. Other apps' pipes (e.g. a client's own service pipe) are left out."""
+    if not IS_WIN:
+        return []
+    try:
+        names = os.listdir("\\\\.\\pipe\\")
+    except OSError:
+        return []
+    return [n for n in names if "mihomo" in n.lower() and not n.lower().endswith("-service")]
+
+
 def find_controller(api=None, secret=""):
     """Locate the running mihomo's API. Returns (Controller, version).
     Raises SecretNeeded if it is only reachable with a secret, MihomoError if it isn't found at all."""
@@ -295,6 +309,8 @@ def find_controller(api=None, secret=""):
                 add("pipe", str(cfg["external-controller-pipe"]), sec, path)
             if cfg.get("external-controller"):
                 add("tcp", tcp_addr(cfg["external-controller"]), sec, path)
+        for name in mihomo_pipes():  # what a normal user can see of a core run as a service (see below)
+            add("pipe", "\\\\.\\pipe\\" + name, "", "pipe list")
         for p in (9090, 9097, 9091, 9095, 9898, 7900):
             add("tcp", f"127.0.0.1:{p}", "", "default port")
         if IS_WIN:
