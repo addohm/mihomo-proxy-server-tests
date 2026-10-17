@@ -15,13 +15,16 @@ python3 mihomo_speedtest.py                      # test everything
 python3 mihomo_speedtest.py --filter "Japan"     # only matching servers
 python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fast servers/connections
 python3 mihomo_speedtest.py --trace              # also trace the servers that don't work
+python3 mihomo_speedtest.py --save-baseline      # when everything works: keep this run to compare with
+python3 mihomo_speedtest.py --compare            # later: what changed since then
 ```
 
 On Windows, use `py` instead of `python3` (e.g. `py mihomo_speedtest.py`).
 
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
-(also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved next to the script
-as `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv`.
+(also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved as
+`mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv` in a `mihomo-speedtest` folder in your Documents folder
+(or in your home folder if there is none, e.g. on a server); `--out DIR` saves them elsewhere.
 
 If more than one mihomo client is running, the first one found is tested; the line "Connected to mihomo …
 at …" says which. Use `--api` to choose another (e.g. its pipe, `--api \\.\pipe\NAME`).
@@ -69,6 +72,22 @@ Other Notes:
 The Markdown report also lists mihomo's exact error message for each server that didn't work. Reports
 without a "Speed method" line come from older versions, whose speeds included connection setup and so read
 lower.
+
+## Comparing runs (`--save-baseline`, `--compare`)
+
+When everything works well, run once with `--save-baseline`: that run is also saved as `baseline.csv` in
+the reports folder. When something seems wrong later, run with `--compare`: after the test it lists what
+changed since the baseline, in the terminal and in the Markdown report:
+
+- servers that **stopped working** (with the cause) or **work again**;
+- **big changes**, more than 30%, in download, upload, Conn ms or ping (small ones, such as a ping going
+  from 1 to 1.4 ms, don't count);
+- servers **not in the saved report**, and servers **gone from the config**.
+
+`--compare REPORT.csv` compares with any earlier report instead. To make an older report the baseline,
+copy it over `baseline.csv`. Nothing is compared unless you ask. Compare runs made on the same network and
+at a similar time of day; anything else isn't a fair comparison. Reports from versions before the current
+speed method don't get their speeds compared (the output says so).
 
 ## Tracing servers that don't work (`--trace`)
 

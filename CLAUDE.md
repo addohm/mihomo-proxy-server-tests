@@ -45,7 +45,9 @@ python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 Options: `--filter REGEX`, `--size MB` (default 10; upload is half; the only way to change the transfer
 size), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
-`--out DIR` (default: next to the script), `--trace` (off by default; see step 6b below).
+`--out DIR` (default `report.reports_dir()`: `Documents/mihomo-speedtest`, on Windows the real Documents
+folder from the registry's User Shell Folders, else `~/mihomo-speedtest`), `--save-baseline`, `--compare
+[REPORT.csv]` (see 8), `--trace` (off by default; see 6b).
 
 ## Layout
 
@@ -62,7 +64,8 @@ mihomotest/
               estimate/counts
   trace.py    --trace: trace / parse_hops (tracert, tracepath, traceroute, mtr output), owners (Team
               Cymru via mihomo's DNS, whois fallback), summary / hop_list, CDN_ASNS
-  report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
+  report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV),
+              reports_dir, load_report / compare / comparison_lines (--compare)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
               tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
@@ -164,8 +167,17 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    adds the speed method, a `LEGEND` and a "Failure details" section with mihomo's raw errors. Table cells
    show jitter as "182 ±12" (Conn ms, Ping ms); the CSV has separate `conn_ms`, `conn_jitter_ms`,
    `ping_ms`, `ping_jitter_ms` columns plus `first_response_s`, `direct_check`, `other_traffic_mb`,
-   `mihomo_error`, `speed_method`. Falls back to cwd, then the temp dir, if `--out` isn't
-   writable. Reports are git-ignored.
+   `mihomo_error`, `speed_method`, `trace`, `date`. The folder is created if missing; falls back to cwd,
+   then the temp dir, if it isn't writable. Reports are git-ignored.
+   - **Baseline / compare** (roadmap step 7; explicit only, never automatic): `--save-baseline` copies the
+     run's CSV to `baseline.csv` next to it; `--compare` loads `baseline.csv` from `--out` (or the given
+     CSV) **before** testing (missing → stop with a hint) and after the run `compare()` matches servers by
+     name: stopped working / working again (`ok`/`partial` ↔ the others), swings over `SWING` (30 %) and
+     `SWING_MIN` (2 Mbps, 20 ms) in download/upload/conn/ping, "not in the saved report", and "gone from
+     the config" (only servers mihomo no longer has, so `--filter` doesn't fake it). Speeds are compared
+     only when every row of the saved report has the current `speed_method`. The date comes from the CSV's
+     `date` column, else its file name, else its mtime. Printed after the table and saved as "Changes since
+     the saved report" in the Markdown. Without a baseline, one "Tip: run with --save-baseline …" line.
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probes), `https://speed.cloudflare.com/__down` / `__up`.

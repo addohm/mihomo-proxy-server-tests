@@ -14,7 +14,7 @@ nothing here is started until the user says so. Done items are removed (see git 
 5. ~~Windows paths: test and fix on the China tester / the Windows 11 VM~~ — done 2026-10-17 (Clash Verge
    Rev, Clash Party, FlClash, Clash Nyanpasu, plain mihomo)
 6. ~~`--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)~~ — done 2026-10-17
-7. Per-user reports folder + baseline / `--compare`
+7. ~~Per-user reports folder + baseline / `--compare`~~ — done 2026-10-17
 8. Clearer result labels
 9. GUI (local web page)
 10. Packaging + releases
@@ -46,6 +46,12 @@ step 9.
   Only runs with `--trace`; document that hop IPs are sent to that lookup service.
 
 ## 7. Reports folder and compare runs
+
+Done 2026-10-17 as decided below (details in CLAUDE.md, "How it works" 8). Checked on the Linux test server
+(no baseline → clear stop; `--save-baseline`; a server blocked with nftables → "Stopped working") and on the
+Windows VM (reports in `Documents\mihomo-speedtest`, tip, baseline, compare). Also decided while doing it:
+a server missing from the saved report is listed as "not in the saved report (new, or not tested then)",
+since a filtered baseline can't tell the two apart; small swings need at least 2 Mbps / 20 ms as well as 30 %.
 
 - Decided: reports and baseline go to one **per-user folder** for both script and app (e.g.
   `Documents/mihomo-speedtest`); `--out` still overrides. This changes the script's current default (next

@@ -16,7 +16,8 @@ What it does
      (10 pings each). Servers behind Cloudflare's CDN are labelled: their ping shows
      the CDN edge, not the server. With --trace, traces the servers that didn't work.
   5. Restores TUN, mode and your server selections (also on Ctrl+C, or on Windows when the
-     window is closed), prints the results and saves a Markdown and a CSV report.
+     window is closed), prints the results and saves a Markdown and a CSV report (and, with
+     --compare, what changed since a saved run).
 
 Works on Linux, macOS and Windows. Uses the system's curl and ping.
 While the test runs, traffic that goes through mihomo uses the server under test.
@@ -29,13 +30,19 @@ Optional arguments
   --api ADDR       controller address if it is not found automatically
                    (127.0.0.1:9090, unix:/path/to.sock or \\\\.\\pipe\\name)
   --secret TEXT    controller secret (or set MIHOMO_SECRET; asked for if needed)
-  --out DIR        where to save the reports (default: next to mihomo_speedtest.py)
+  --out DIR        where to save the reports (default: mihomo-speedtest in your Documents
+                   folder, or in your home folder if there is no Documents folder)
+  --save-baseline  also save this run as baseline.csv in the report folder
+  --compare [FILE] after the test, show what changed since baseline.csv (or since the
+                   given report .csv): servers that stopped working or work again, big
+                   changes (over 30%) in speed, Conn ms or ping, new and removed servers
   --trace          for servers that didn't work, show where the path stops and who owns
                    each hop: a path trace for "failed" servers, a TCP trace to the port for
                    "unreachable" ones (Linux, run with sudo). Hop addresses are looked up
                    with Team Cymru's ASN service (through mihomo's DNS, else whois.cymru.com).
 """
 import argparse
+import csv
 import datetime
 import getpass
 import os
@@ -49,7 +56,8 @@ import time
 import unicodedata
 
 from .mihomo import STOP_SIGNALS, MihomoError, SecretNeeded, find_controller, list_servers
-from .report import HEADERS, LEGEND, cells, mmss, notes, save_reports
+from .report import (BASELINE, HEADERS, LEGEND, cells, compare, comparison_lines, load_report, mmss, notes,
+                     reports_dir, save_reports)
 from .system import IS_WIN, prereqs
 from .tests import counts, run_tests
 
@@ -60,7 +68,6 @@ for _stream in (sys.stdout, sys.stderr):  # e.g. ✔ or server names when output
         _stream.reconfigure(errors="replace")
 RESTORED = threading.Event()
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # where mihomo_speedtest.py lives
 WIDTHS = [(3, True), (28, False), (9, False), (10, True), (10, True), (6, True), (9, True), (8, True), (11, False)]
 NOT_FOUND = ("\n  • Make sure your client (or mihomo) is running."
              "\n  • Enable its external controller, or pass --api ADDRESS (and --secret)."
@@ -213,11 +220,26 @@ def main():
     ap.add_argument("--timeout", type=positive(int), default=25, help="max seconds per transfer. Default 25")
     ap.add_argument("--api", help="controller address, if not found automatically")
     ap.add_argument("--secret", default="", help="controller secret (or MIHOMO_SECRET)")
-    ap.add_argument("--out", default=APP_DIR, help="report folder")
+    ap.add_argument("--out", default=reports_dir(), help=f"report folder. Default {reports_dir()}")
+    ap.add_argument("--save-baseline", action="store_true",
+                    help=f"also save this run as {BASELINE} in the report folder, to compare later runs with")
+    ap.add_argument("--compare", nargs="?", const="", metavar="REPORT.csv",
+                    help=f"after the test, show what changed since {BASELINE} (or since the given report)")
     ap.add_argument("--trace", action="store_true",
                     help="trace the servers that didn't work and look up who owns each hop (sends hop addresses "
                          "to Team Cymru's lookup service)")
     args = ap.parse_args()
+    base_path = os.path.join(args.out, BASELINE)
+    base = None
+    if args.compare is not None:
+        cpath = args.compare or base_path
+        if not os.path.isfile(cpath):
+            sys.exit(bad(f"Nothing to compare with: {cpath} doesn't exist.") +
+                     ("\n  Run once with --save-baseline when everything works well." if not args.compare else ""))
+        try:
+            base = (cpath, *load_report(cpath))
+        except (OSError, ValueError, csv.Error) as e:
+            sys.exit(bad(f"Can't read {cpath}: {e}"))
 
     print(bold("mihomo server speed test\n"))
     if not check_prereqs():
@@ -239,6 +261,7 @@ def main():
     t0 = time.time()
     try:
         servers = list_servers(ctl)
+        names_now = {s["name"] for s in servers}
         if args.filter:
             rx = re.compile(args.filter, re.I)
             servers = [s for s in servers if rx.search(s["name"])]
@@ -265,5 +288,18 @@ def main():
         print(f"Fastest download: {bold(b['name'])} ({b['down']:.1f} Mbps)")
     meta = {"date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "version": version, "api": str(ctl),
             "size": args.size, "runtime": runtime, "total": len(results), **n}
-    md, cs = save_reports(results, meta, args.out)
+    comparison = None
+    if base:
+        comparison = comparison_lines(compare(results, base[2], names_now), base[1], base[0], meta["date"])
+        print("\n" + bold(comparison[0]))
+        for line in comparison[1:]:
+            print(bad(line) if line.startswith("Stopped") else line)
+    md, cs = save_reports(results, meta, args.out, comparison)
     print(f"\nReports saved:\n  {md}\n  {cs}")
+    if args.save_baseline:
+        dest = os.path.join(os.path.dirname(cs), BASELINE)
+        shutil.copyfile(cs, dest)
+        print(f"Saved as the baseline: {dest}")
+    elif not os.path.isfile(base_path):
+        print(dim("Tip: run with --save-baseline when everything works well, so you can compare later "
+                  "with --compare."))
