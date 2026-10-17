@@ -50,22 +50,23 @@ ssh root@HOST 'tail -n 20 /root/matrix.log'
 A Windows PC (e.g. in mainland China, behind a dynamic IP) that we reach over SSH even though nothing can
 connect to it: it keeps a reverse SSH tunnel to the test server. The tunnel tooling is its own project,
 **[revtunnel](https://github.com/addohm/revtunnel)**; its README has the full, step-by-step workflow and
-troubleshooting. For a tester PC:
+troubleshooting. In revtunnel's words the tester PC is the **target** and the test server the **relay**.
+For a tester PC:
 
-1. **On your computer:** download `revtunnel-windows.ps1` from the revtunnel repository and
+1. **On your computer:** download `revtunnel-target-windows.ps1` from the revtunnel repository and
    `testserver/tester-windows.cmd` from this one (GitHub: open the file, then **Raw**), into the same
-   folder on the PC. Download `revtunnel-server.sh` too, for the server.
+   folder on the PC.
 2. **On the PC:** turn TUN off in the mihomo client first, then double-click `tester-windows.cmd`. It is
    revtunnel's setup with the tester's extras already chosen (tunnel name `mihomo-tester`, keep awake,
    VPNs off, Python 3.13 with PyYAML). Answer the remaining questions: Enter for port 22; paste the login
    keys (e.g. Claude's, `~/.ssh/mihomo-winvm.pub` on the bot's host); the test server's address; its own
    port on the server (2222 for the first PC, 2223 for the next, ...).
-3. **On the test server:** when the PC shows **ACTION NEEDED - on the SERVER**, run the line it shows,
-   with `revtunnel-server.sh` copied there (or paste the PC's key here and Claude runs it).
+3. **On the test server:** when the PC shows **ACTION NEEDED - on the RELAY**, run the two lines it shows
+   there (they download `revtunnel-relay.sh`), or paste the PC's tunnel key here and Claude runs them.
 4. **On the PC:** press Enter. Setup ends with **DONE**.
 
 Then, from the test server: `ssh -p PORT WINDOWS_USER@127.0.0.1`. Re-run `tester-windows.cmd` any time
-for the status, a new server address, more login keys or removal. `sudo bash revtunnel-server.sh --list`
+for the status, a new server address, more login keys or removal. `sudo bash revtunnel-relay.sh --list`
 on the server shows every tester PC and whether it's connected.
 
 **Testing on the PC** goes through the tunnel; nobody needs to be at the PC:

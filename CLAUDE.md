@@ -170,7 +170,7 @@ A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`,
 controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
 Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
 options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing; `TUNNEL_KEY=…`
-also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied next to it).
+also lets a tester PC's tunnel in via revtunnel's `revtunnel-relay.sh`, copied next to it).
 
 - Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
   host key pinned). Fedora 44, x86_64, ~450 MB RAM, IPv4 + IPv6 (IPv6 configured by hand with nmcli —
@@ -198,10 +198,10 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-server.sh`, copied 
 - **Windows tester** (roadmap step 4): the reverse-tunnel tooling is its own project, **revtunnel**
   (`addohm/revtunnel`, workspace `/srv/claude/workspaces/revtunnel`; generic: Windows + Linux PCs, any
   port, named tunnels, guided steps, status + re-run menu). This repo keeps only the preset
-  `testserver/tester-windows.cmd` (runs `revtunnel-windows.ps1` next to it with `-Name mihomo-tester
+  `testserver/tester-windows.cmd` (runs `revtunnel-target-windows.ps1` next to it with `-Name mihomo-tester
   -KeepAwake -NoVpn -Python 3.13 -PythonPackages pyyaml`) and the workflow in `testserver/README.md`.
-  Server side: `revtunnel-server.sh KEY PORT` on the test server (user `tunnel`, sshd drop-ins
-  `40-revtunnel.conf` / `41-revtunnel-tunnel.conf`; `--list` shows every PC and whether it's connected).
+  revtunnel calls the tester PC the **target** and the test server the **relay**. Relay side:
+  `revtunnel-relay.sh KEY PORT` on the test server (user `tunnel`, sshd drop-in `41-revtunnel-tunnel.conf`; `--list` shows every PC and whether it's connected).
   - The VM (in mainland China, Windows 11, user `addohm`) is reachable: `ssh mihomo-winvm` (in
     `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump mihomo-testserver`). It still
     runs the **pre-revtunnel** tunnel (task "mihomo-tester tunnel", `C:\ProgramData\mihomo-tester`,

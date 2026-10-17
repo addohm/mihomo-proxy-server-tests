@@ -15,10 +15,10 @@
 #                   The SSH client's IP is excluded from TUN routing so the session survives. Default 0.
 #   SUB_UA          User-Agent for fetching the subscription (default looks like a mihomo client, so
 #                   providers return a full mihomo profile)
-#   TUNNEL_KEY      optional: a tester PC's tunnel key (shown by its revtunnel setup); also lets that PC's
-#                   reverse SSH tunnel in via revtunnel-server.sh (from the revtunnel repository), which
+#   TUNNEL_KEY      optional: a tester PC's tunnel key (shown by its revtunnel setup; the PC is revtunnel's target, this server its relay); also lets that PC's
+#                   reverse SSH tunnel in via revtunnel-relay.sh (from the revtunnel repository), which
 #                   must be copied next to this script. TUNNEL_PORT: its port here (default 2222).
-#                   Without mihomo, run revtunnel-server.sh on its own.
+#                   Without mihomo, run revtunnel-relay.sh on its own.
 #
 # Everything listens on 127.0.0.1 only: controller 127.0.0.1:9090 (random secret), mixed-port 7890.
 set -euo pipefail
@@ -31,7 +31,7 @@ TUNNEL_KEY="${TUNNEL_KEY:-}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
-[ -z "$TUNNEL_KEY" ] || [ -f "$HERE/revtunnel-server.sh" ] || { echo "TUNNEL_KEY needs revtunnel-server.sh (revtunnel repository) next to this script." >&2; exit 1; }
+[ -z "$TUNNEL_KEY" ] || [ -f "$HERE/revtunnel-relay.sh" ] || { echo "TUNNEL_KEY needs revtunnel-relay.sh (revtunnel repository) next to this script." >&2; exit 1; }
 grep -qi fedora /etc/os-release || echo "Warning: not Fedora; continuing anyway." >&2
 
 echo "==> Packages"
@@ -146,7 +146,7 @@ print(f"   mihomo is up: {n} servers")' \
 
 if [ -n "$TUNNEL_KEY" ]; then
     echo "==> Tester tunnel"
-    bash "$HERE/revtunnel-server.sh" "$TUNNEL_KEY" "${TUNNEL_PORT:-2222}"
+    bash "$HERE/revtunnel-relay.sh" "$TUNNEL_KEY" "${TUNNEL_PORT:-2222}"
 fi
 
 echo
