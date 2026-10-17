@@ -238,9 +238,11 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 
 - Python 3.13.16 + PyYAML (`py -V:3.13`); test code in `C:\Users\addohm\mst` (copy the current code over
   before testing).
-- Clients, all with the same subscription (`trixu`), TUN off, none starting at login; **run one at a
-  time** (they share port 7890), and close the others first:
-  - **Clash Verge Rev** (the normal one, left running): service `clash_verge_service` (Auto) + GUI;
+- Windows signs in automatically (Sysinternals Autologon) and **Clash Verge Rev starts at login**
+  (minimized, TUN off); checked after a reboot on 2026-10-17: tunnel back, Verge found, short run ok.
+- Clients, all with the same subscription (`trixu`), TUN off, only Verge starting at login; **run one at
+  a time** (they share port 7890), and close the others first:
+  - **Clash Verge Rev** (the normal one, starts at login): service `clash_verge_service` (Auto) + GUI;
     pipe controller. TUN setting is `enable_tun_mode` in `%APPDATA%\io.github.clash-verge-rev…\verge.yaml`.
   - **Clash Party** 2.0.3: `C:\Program Files\Clash Party\Clash Party.exe`; pipe controller.
   - **FlClash** 0.9.0: External controller on (127.0.0.1:9090, secret in its `shared_preferences.json`);
