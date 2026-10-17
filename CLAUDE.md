@@ -158,23 +158,18 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probe
 
 ## Remote test server
 
-> **2026-10-16: the Fedora test server below is deleted** (user); don't connect to its old address (the
-> `mihomo-testserver` alias is removed). Now: an Ubuntu 24.04 VPS in Singapore, `/claude ssh` host
-> `sgp-vps` (`/srv/claude/data/ssh/mihomo-proxy-server-tests/ssh sgp-vps '...'`), **without mihomo yet**,
-> holding the revtunnel tunnel (`main`, port 2222) of a **freshly installed** Windows 11 VM in mainland
-> China (`DESKTOP-BJUBIRD`, user `addohm`, Python 3.13.16; no mihomo client yet). `ssh mihomo-winvm` now
-> reaches that VM (ProxyCommand through `sgp-vps`, the workspace's `/claude ssh` key, which is the VM's
-> only login key). The notes below describe the old setup until the new one is decided.
+An Ubuntu 24.04 VPS in Singapore (`sgp-vps`, set up 2026-10-17; the earlier Fedora server was deleted, and
+the `mihomo-testserver` alias with it) running a plain mihomo core as a systemd service (`mihomo.service`,
+config `/etc/mihomo/`, controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890,
+everything on localhost only). It is also the revtunnel relay for the Windows tester VM (tunnel `main`,
+port 2222). Set up (or re-set up with a new subscription) by `testserver/setup.sh` (Fedora or
+Debian/Ubuntu); see its header for usage and options (`TUN=1` enables TUN at rest, with the SSH client's
+IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in via revtunnel's
+`revtunnel-relay.sh`, copied next to it).
 
-A Fedora VPS running a plain mihomo core as a systemd service (`mihomo.service`, config `/etc/mihomo/`,
-controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890, everything on localhost only).
-Set up (or re-set up with a new subscription) by `testserver/setup.sh`; see its header for usage and
-options (`TUN=1` enables TUN at rest, with the SSH client's IP excluded from TUN routing; `TUNNEL_KEY=…`
-also lets a tester PC's tunnel in via revtunnel's `revtunnel-relay.sh`, copied next to it).
-
-- Access: `ssh mihomo-testserver` (alias in `~/.ssh/config`, dedicated key `~/.ssh/mihomo-testserver`,
-  host key pinned). Fedora 44, x86_64, ~450 MB RAM, IPv4 + IPv6 (IPv6 configured by hand with nmcli —
-  DigitalOcean doesn't apply it to existing droplets). Keep the IP out of the repo.
+- Access: the workspace's `/claude ssh` host, `/srv/claude/data/ssh/mihomo-proxy-server-tests/ssh sgp-vps
+  '...'` (root; also `scp -S <that ssh>`). x86_64, ~460 MB RAM, IPv4 only (the IPv6 test servers get "no
+  route"). Keep the IP out of the repo.
 - **Never commit the subscription URL** or anything from `/etc/mihomo/`; it contains credentials. Don't
   print provider/config files in tool output either.
 - `/etc/mihomo/config.default.yaml` is the default setup (subscription profile with the IPv6 servers'
@@ -188,9 +183,12 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-relay.sh`, copied n
   checks found / tested / restored (every selector group) / exit code, then returns to the default. Copy
   both to `/root/testserver/`. **Run the matrix before every release and after changes to discovery,
   selection, state or restore.** It toggles TUN, so start it detached and poll the log for
-  "variants passed" (don't `pgrep` for it — the check matches itself):
-  `ssh mihomo-testserver 'SSH_IP=${SSH_CLIENT%% *} setsid nohup python3 /root/testserver/matrix.py
-  /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'`
+  "variants passed" (don't `pgrep` for it — the check matches itself). The `tun=on` variant must exclude
+  every SSH peer from TUN routing, including the Windows VM's tunnel (its address in China changes), so
+  collect them at start: `IPS=$(ss -tn state established "( sport = :22 )" | awk 'NR>1{print $4}' | sed -E
+  's/^\[?([^]]*)\]?:[0-9]+$/\1/' | sort -u | paste -sd,); SSH_IP="$IPS" setsid nohup python3
+  /root/testserver/matrix.py /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &` (run on
+  the VPS). 2026-10-17 on `sgp-vps`: 8 of 8 passed, the VM's tunnel stayed up.
 - Simulating failures: a temporary nftables table on the output hook (`drop` = blocked port,
   `reject with tcp reset` = refused; a local UDP drop shows as "operation not permitted"), and
   `tc … netem delay` on a `prio bands 4` band filtered by destination IP for slow starters. Always delete
@@ -202,13 +200,8 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-relay.sh`, copied n
   -KeepAwake -NoVpn -Python 3.13 -PythonPackages pyyaml`) and the workflow in `testserver/README.md`.
   revtunnel calls the tester PC the **target** and the test server the **relay**. Relay side:
   `revtunnel-relay.sh KEY PORT` on the test server (user `tunnel`, sshd drop-in `41-revtunnel-tunnel.conf`; `--list` shows every PC and whether it's connected).
-  - The VM (in mainland China, Windows 11, user `addohm`) is reachable: `ssh mihomo-winvm` (in
-    `~/.ssh/config`: 127.0.0.1:2222, key `~/.ssh/mihomo-winvm`, `ProxyJump mihomo-testserver`). It still
-    runs the **pre-revtunnel** tunnel (task "mihomo-tester tunnel", `C:\ProgramData\mihomo-tester`,
-    Python 3.15, plus 3.13.16 with PyYAML 6.0.3 since 2026-10-16: run `py -V:3.13`); moving it to the preset is pending (it cuts the SSH session the other
-    VM work uses, so coordinate first: set up the preset on port 2223, check a login there, then remove
-    the old task and switch `mihomo-winvm` to 2223). Its mihomo client's TUN adapter (`Meta`) was
-    disabled by the first setup. **TUN stays off at rest on the tester PC** (user, 2026-10-16), so the
+  - The VM (in mainland China, Windows 11, user `addohm`) is reachable as `ssh mihomo-winvm` through its
+    revtunnel tunnel on `sgp-vps`; see "Windows tester VM" below. **TUN stays off at rest on the tester PC** (user, 2026-10-16), so the
     tunnel never runs through the client under test; turn it on only for a TUN test, and turn it off
     again after.
   - For unattended use the PC also needs Windows auto sign-in and the client set to start at login (the

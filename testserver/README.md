@@ -6,7 +6,7 @@ Windows tester PCs reached through a reverse SSH tunnel (set up with
 
 | File | Runs on | What it does |
 |---|---|---|
-| `setup.sh` | Fedora VPS, as root | Installs mihomo as a service from a subscription URL: the Linux test server |
+| `setup.sh` | Fedora or Debian/Ubuntu VPS, as root | Installs mihomo as a service from a subscription URL: the Linux test server |
 | `variant.py` | test server | Switches mihomo into one config variant (controller, secret, port, TUN, source) |
 | `matrix.py` | test server | Runs the speed test on every variant and checks it found, tested and restored |
 | `tester-windows.cmd` | Windows tester PC | revtunnel preset for a tester PC (double-click) |
@@ -41,6 +41,16 @@ scp testserver/variant.py testserver/matrix.py root@HOST:/root/testserver/
 ssh root@HOST 'SSH_IP=${SSH_CLIENT%% *} setsid nohup python3 /root/testserver/matrix.py \
     /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'
 ssh root@HOST 'tail -n 20 /root/matrix.log'
+```
+
+`SSH_IP` is the address the `tun=on` variant keeps out of TUN routing so the SSH session survives. If the
+server is also a tester PC's tunnel relay, give every SSH peer (comma-separated), or the tunnel drops
+while TUN is on:
+
+```bash
+ssh root@HOST 'SSH_IP=$(ss -tn state established "( sport = :22 )" | awk "NR>1{print \$4}" \
+    | sed -E "s/:[0-9]+$//; s/[][]//g" | sort -u | paste -sd,) setsid nohup python3 \
+    /root/testserver/matrix.py /root/mst/mihomo_speedtest.py > /root/matrix.log 2>&1 < /dev/null &'
 ```
 
 `python3 /root/testserver/variant.py` on its own puts the default config back.

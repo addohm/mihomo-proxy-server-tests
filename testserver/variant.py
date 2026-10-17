@@ -8,8 +8,9 @@ Changes (anything not given keeps the default):
     controller=tcp|unix          API on 127.0.0.1:9090, or only on the Unix socket /etc/mihomo/mihomo.sock
     secret=yes|no                API secret as in the default config, or none
     port=mixed|socks|http|none   local proxy port: mixed-port 7890, socks-port 7891, port 7892, or none
-    tun=off|on                   TUN at rest; the SSH client's IP ($SSH_CLIENT / $SSH_IP) is excluded from
-                                 TUN routing so the session survives
+    tun=off|on                   TUN at rest; the SSH client's IP ($SSH_CLIENT, or $SSH_IP: one or more
+                                 addresses, comma-separated, e.g. also a tester PC's tunnel) is excluded
+                                 from TUN routing so those connections survive
     source=profile|provider      servers listed in the config, or loaded from a file proxy provider
 
 Builds /etc/mihomo/config.yaml from /etc/mihomo/config.default.yaml (created from the current config.yaml
@@ -63,9 +64,9 @@ def build(v, ssh_ip=""):
         cfg[key] = port
     tun = cfg.setdefault("tun", {})
     tun["enable"] = v["tun"] == "on"
-    if ssh_ip:
-        excl = ssh_ip + ("/128" if ":" in ssh_ip else "/32")
-        tun["route-exclude-address"] = sorted(set(tun.get("route-exclude-address") or []) | {excl})
+    excl = {ip + ("/128" if ":" in ip else "/32") for ip in (a.strip() for a in ssh_ip.split(",")) if ip}
+    if excl:
+        tun["route-exclude-address"] = sorted(set(tun.get("route-exclude-address") or []) | excl)
     if v["source"] == "provider":
         os.makedirs(os.path.join(DIR, "providers"), exist_ok=True)
         with open(os.path.join(DIR, "providers", "local.yaml"), "w", encoding="utf-8") as f:

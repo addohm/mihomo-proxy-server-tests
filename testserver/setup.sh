@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set up a Fedora VPS as the remote test server for mihomo_speedtest.py.
+# Set up a Fedora or Debian/Ubuntu VPS as the remote test server for mihomo_speedtest.py.
 #
 # Installs curl/ping/python3/PyYAML and a plain mihomo core (no GUI client) as a systemd service, with
 # its config built from a subscription URL, and saves that config as config.default.yaml (the default
@@ -32,10 +32,16 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
 [ -z "$TUNNEL_KEY" ] || [ -f "$HERE/revtunnel-relay.sh" ] || { echo "TUNNEL_KEY needs revtunnel-relay.sh (revtunnel repository) next to this script." >&2; exit 1; }
-grep -qi fedora /etc/os-release || echo "Warning: not Fedora; continuing anyway." >&2
-
 echo "==> Packages"
-dnf -y -q install curl iputils python3 python3-pyyaml gzip </dev/null
+if command -v dnf >/dev/null; then
+    dnf -y -q install curl iputils python3 python3-pyyaml gzip </dev/null
+elif command -v apt-get >/dev/null; then
+    DEBIAN_FRONTEND=noninteractive apt-get -qq update </dev/null
+    DEBIAN_FRONTEND=noninteractive apt-get -y -qq install curl iputils-ping python3 python3-yaml gzip </dev/null
+else
+    echo "Neither dnf nor apt-get found: install curl, ping, python3 + PyYAML and gzip by hand." >&2
+    exit 1
+fi
 
 if [ "$MIHOMO_VERSION" = latest ]; then
     MIHOMO_VERSION="$(curl -fsSL https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
