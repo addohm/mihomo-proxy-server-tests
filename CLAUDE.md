@@ -85,7 +85,10 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
    `/logs`.
 3. `MihomoState`: records mode, TUN, `GLOBAL` selection (and, as they're touched, every other selector
    group's selection); turns TUN off, sets mode `global`; opens a temporary `mixed-port` only if there's no
-   local proxy port. `restore()` runs first in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK), before anything
+   local proxy port. Right after `apply()`, `proxy_answers` (tests.py) sends one proxy handshake to that
+   port: a paused core (FlClash when not started) accepts and drops it at once, and every server would look
+   unreachable, so the run stops with a `MihomoError` ("isn't passing connections … is your client
+   started?"); a timeout counts as answering. `restore()` runs first in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK), before anything
    that could delay it (e.g. closing the log stream, which on a Windows pipe is done in a daemon thread
    because it can block), and puts every touched group back (inner groups first, `GLOBAL` last); those
    signals are ignored while it runs so a second Ctrl+C can't cut it short. Windows: closing the console
@@ -255,8 +258,14 @@ user says so.
   client for a test: `winget` over SSH works; start GUI apps in the user's session with a scheduled task
   (`LogonType Interactive`); Clash Party ignored a `clash://install-config` link passed on its command
   line, so its profile was written directly (`profile.yaml` + `profiles\<id>.yaml`, content copied from
-  Verge's). Clash Verge Rev's service is `clash_verge_service`. Not covered: other Windows clients
-  (Nyanpasu, FlClash) and a non-English Windows (ping parsing only checked
+  Verge's). Clash Verge Rev's service is `clash_verge_service`. **FlClash** (0.9.0): core
+  `FlClashCore.exe` (its pipe is FlClash's own channel, not mihomo's API); no controller until the user
+  turns on "External controller" (`127.0.0.1:9090`, with a secret kept in
+  `%APPDATA%\com.follow\clash\shared_preferences.json`, not YAML, so the test asks for it or takes
+  `--secret` / `MIHOMO_SECRET`); until its Start button is pressed the core is paused (mixed-port 0, proxy
+  connections dropped: that's what `proxy_answers` catches). Its config lives in its own database, so
+  win_matrix doesn't apply; short run, Ctrl+C and close PASS. Its first-run disclaimer blocks imports until
+  clicked in its window. Not covered: Nyanpasu and a non-English Windows (ping parsing only checked
   offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
   see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are

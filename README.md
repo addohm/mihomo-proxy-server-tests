@@ -68,6 +68,14 @@ The Markdown report also lists mihomo's exact error message for each server that
 without a "Speed method" line come from older versions, whose speeds included connection setup and so read
 lower.
 
+## Client notes
+
+- **FlClash**: turn on *External controller* in its settings and press *Start*. Its controller has a
+  secret the script can't read from FlClash's settings, so it asks for it (or pass `--secret`). If the
+  client isn't started, the script stops with "mihomo isn't passing connections … is your client
+  started?" instead of reporting every server as unreachable.
+- **Clash Verge Rev**, **Clash Party**: found on their own, no settings needed.
+
 ## Requirements
 
 Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all options.

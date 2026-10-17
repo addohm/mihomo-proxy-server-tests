@@ -11,7 +11,7 @@ import statistics
 import tempfile
 import time
 
-from .mihomo import LogWatcher, MihomoState, config_servers, mihomo_resolve, remote_ip, traffic_total
+from .mihomo import LogWatcher, MihomoError, MihomoState, config_servers, mihomo_resolve, remote_ip, traffic_total
 from .system import CURL, IS_MAC, IS_WIN, NULL_DEV, run
 
 PROBE_URL = "http://www.gstatic.com/generate_204"
@@ -142,6 +142,23 @@ def tcp_check(host, port, timeout=5):
         return "no answer"
     except OSError as e:
         return "no route" if e.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH) else str(e)
+
+
+def proxy_answers(proxy, timeout=5):
+    """False if mihomo's local proxy port accepts connections but drops them at once. A paused core (e.g.
+    FlClash when it isn't started) does that, and every server would then look unreachable. A working
+    mihomo answers the first proxy handshake at once, whatever the servers do."""
+    scheme, _, addr = proxy.partition("://")
+    host, port = addr.rsplit(":", 1)
+    hello = b"\x05\x01\x00" if scheme.startswith("socks") else b"GET http://127.0.0.1:9/ HTTP/1.0\r\n\r\n"
+    try:
+        with socket.create_connection((host.strip("[]"), int(port)), timeout=timeout) as s:
+            s.sendall(hello)
+            return bool(s.recv(2))
+    except socket.timeout:
+        return True  # slow, not dropped
+    except OSError:
+        return False
 
 
 def add_note(r, text):
@@ -283,6 +300,10 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
             emit("busy", {"rate": rate})
         proxy = state.proxy_url()
         state.apply()
+        if not proxy_answers(proxy):
+            raise MihomoError(f"mihomo isn't passing connections through its proxy port ({proxy}): it accepts "
+                              "them and drops them at once. Is your client started / connected? (Nothing was tested; "
+                              "your settings are restored.)")
         logs = LogWatcher(ctl)
         for i, srv in enumerate(servers, 1):
             left = (time.time() - t0) / (i - 1) * (len(servers) - i + 1) if i > 1 else est
