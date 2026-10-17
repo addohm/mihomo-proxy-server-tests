@@ -74,7 +74,8 @@ lower.
   secret the script can't read from FlClash's settings, so it asks for it (or pass `--secret`). If the
   client isn't started, the script stops with "mihomo isn't passing connections … is your client
   started?" instead of reporting every server as unreachable.
-- **Clash Verge Rev**, **Clash Party**: found on their own, no settings needed.
+- **Clash Verge Rev**, **Clash Party**, **Clash Nyanpasu**: found on their own, no settings needed (Nyanpasu's
+  controller secret is read from its config, which needs PyYAML; without it the script asks for it).
 
 ## Requirements
 

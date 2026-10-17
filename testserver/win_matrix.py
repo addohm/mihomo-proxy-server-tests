@@ -16,7 +16,8 @@ Before each variant: mode rule, GLOBAL on the first chosen server. After the tes
 and every selector group's selection must be exactly as before; it must have found mihomo and tested every
 chosen server. Left out: TUN (on a tester PC it would carry the tunnel itself), and a TCP controller
 (mihomo only opens one at start-up, not when a config is loaded through the API; that code is the same on
-every OS and covered by matrix.py on Linux).
+every OS and covered by matrix.py on Linux). Clients with a TCP controller (e.g. Clash Nyanpasu) work too,
+but skip "secret": the controller keeps its start-up secret through a config load.
 Needs PyYAML (py -3.13 on the tester PC); --python picks the Python that runs the speed test.
 """
 import argparse
@@ -25,6 +26,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 import tempfile
@@ -39,7 +41,8 @@ VARIANTS = ["default", "secret", "socks", "http", "noport", "provider"]
 
 
 class Core:
-    """The running mihomo: its pipe, config file and home directory, from its command line."""
+    """The running mihomo: its controller (named pipe, or else the TCP external-controller in its config),
+    config file and home directory, from its command line."""
 
     def __init__(self):
         ps = ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_Process | Where-Object { $_.Name "
@@ -47,23 +50,32 @@ class Core:
         cmd = subprocess.run(ps, capture_output=True, text=True).stdout
         arg = lambda flag: (re.search(rf"{flag}\s+(\"[^\"]+\"|\S+)", cmd) or [None, None])[1]
         self.pipe, self.home = arg("-ext-ctl-pipe"), arg("-d")
-        if not (self.pipe and self.home):
-            sys.exit(f"no mihomo with -ext-ctl-pipe and -d found:\n{cmd}")
+        if not self.home:
+            sys.exit(f"no mihomo with -d found:\n{cmd}")
         self.home = self.home.strip('"')
         # without -f mihomo reads config.yaml in its home directory (e.g. Clash Party)
         self.config = (arg("-f") or os.path.join(self.home, "config.yaml")).strip('"')
         self.original = yaml.safe_load(open(self.config, encoding="utf-8"))
         self.secret = str(self.original.get("secret") or "")
+        self.tcp = None if self.pipe else str(self.original.get("external-controller") or "").replace("0.0.0.0", "127.0.0.1")
+        if not (self.pipe or self.tcp):
+            sys.exit("the core has neither -ext-ctl-pipe nor an external-controller in its config")
+
+    def _open(self):
+        if self.pipe:
+            return open(self.pipe, "r+b", buffering=0)
+        host, port = self.tcp.rsplit(":", 1)
+        return socket.create_connection((host, int(port)), timeout=20).makefile("rwb", buffering=0)
 
     def api(self, method, path, body=None, timeout=20):
-        """HTTP/1.0 over the pipe, independent of the code under test. Returns (status, JSON or None)."""
+        """HTTP/1.0 over the pipe or TCP, independent of the code under test. Returns (status, JSON or None)."""
         data = json.dumps(body).encode() if body is not None else b""
         head = (f"{method} {path} HTTP/1.0\r\nHost: localhost\r\nContent-Type: application/json\r\n"
                 f"Content-Length: {len(data)}\r\n" + (f"Authorization: Bearer {self.secret}\r\n" if self.secret else ""))
         end = time.time() + timeout
         while True:
             try:
-                f = open(self.pipe, "r+b", buffering=0)
+                f = self._open()
                 break
             except OSError:
                 if time.time() > end:
@@ -92,10 +104,11 @@ class Core:
         st, body = self.api("PUT", "/configs?force=true", {"path": path})
         if st not in (200, 204):
             raise SystemExit(f"mihomo refused {path}: HTTP {st} {body}")
-        self.secret = secret
+        old = self.secret
         for _ in range(30):
-            if (self.api("GET", "/version")[1] or {}).get("version"):
-                return
+            for self.secret in (secret, old):  # a TCP controller keeps its start-up secret through a load
+                if (self.api("GET", "/version")[1] or {}).get("version"):
+                    return
             time.sleep(1)
         raise SystemExit(f"mihomo's API did not come back after loading {path}")
 
@@ -113,6 +126,8 @@ def build(core, name):
     args = []
     if name == "secret":
         cfg["secret"] = secrets.token_hex(12)
+        if core.tcp:  # the test reads the secret from the core's own -f file, not from this variant's copy
+            args = ["--secret", cfg["secret"]]
     elif name in ("socks", "http", "noport"):
         cfg.pop("mixed-port", None)
         if name != "noport":
@@ -177,12 +192,16 @@ def main():
     opts.speedtest = os.path.abspath(opts.speedtest)
     core = Core()
     start = core.snapshot()
-    print(f"mihomo config: {core.config}\nspeed test with: {opts.python}")
+    print(f"mihomo config: {core.config}\ncontroller: {core.pipe or core.tcp}\nspeed test with: {opts.python}")
     passed, names = 0, opts.only or VARIANTS
     out_dir = tempfile.mkdtemp(prefix="mst-matrix-")
     try:
         for name in names:
             print(f"--- {name}", flush=True)
+            if name == "secret" and core.tcp:
+                print("SKIP  secret    a TCP controller keeps the secret it started with; a config load can't change it")
+                passed += 1
+                continue
             try:
                 ok, checks, out = run_variant(core, name, opts, out_dir)
             except subprocess.TimeoutExpired:

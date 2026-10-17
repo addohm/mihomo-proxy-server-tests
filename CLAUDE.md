@@ -265,7 +265,14 @@ user says so.
   `--secret` / `MIHOMO_SECRET`); until its Start button is pressed the core is paused (mixed-port 0, proxy
   connections dropped: that's what `proxy_answers` catches). Its config lives in its own database, so
   win_matrix doesn't apply; short run, Ctrl+C and close PASS. Its first-run disclaimer blocks imports until
-  clicked in its window. Not covered: Nyanpasu and a non-English Windows (ping parsing only checked
+  clicked in its window. **Clash Nyanpasu** (1.6.1, bundles mihomo **v1.18.8**): `mihomo.exe -m -d
+  …\Local\Clash Nyanpasu\data -f …\Roaming\Clash Nyanpasu\config\clash-config.yaml` in the user's session,
+  TCP controller `127.0.0.1:17650` with a secret, both read from that `-f` file (PyYAML); short run,
+  Ctrl+C, close and win_matrix (5 PASS, secret skipped) all pass. A profile written into its
+  `profiles.yaml` was ignored; it had to be added in its window and the app restarted before it could be
+  activated. Finding: a TCP controller also keeps the secret it started with through a config load
+  (win_matrix now skips "secret" for TCP controllers and falls back to the old secret after a load).
+  Not covered: a non-English Windows (ping parsing only checked
   offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
   see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
