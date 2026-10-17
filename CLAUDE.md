@@ -228,6 +228,34 @@ also lets a tester PC's tunnel in via revtunnel's `revtunnel-relay.sh`, copied n
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
+### Windows tester VM: what's on it (2026-10-17, snapshot taken by the user after this)
+
+`DESKTOP-BJUBIRD` (mainland China), reached as `ssh mihomo-winvm`. The VM's host key isn't kept in the
+workspace's `/claude ssh` known_hosts (that file is rewritten): pass `-o UserKnownHostsFile=~/.ssh/
+known_hosts_revtunnel_vm -o StrictHostKeyChecking=yes` (key recorded there). GitHub and winget's sources
+aren't reachable from the VM without a proxy: download installers on `sgp-vps`, check them against the
+winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
+
+- Python 3.13.16 + PyYAML (`py -V:3.13`); test code in `C:\Users\addohm\mst` (copy the current code over
+  before testing).
+- Clients, all with the same subscription (`trixu`), TUN off, none starting at login; **run one at a
+  time** (they share port 7890), and close the others first:
+  - **Clash Verge Rev** (the normal one, left running): service `clash_verge_service` (Auto) + GUI;
+    pipe controller. TUN setting is `enable_tun_mode` in `%APPDATA%\io.github.clash-verge-rev…\verge.yaml`.
+  - **Clash Party** 2.0.3: `C:\Program Files\Clash Party\Clash Party.exe`; pipe controller.
+  - **FlClash** 0.9.0: External controller on (127.0.0.1:9090, secret in its `shared_preferences.json`);
+    press Start in its window, else its core is paused. `FlClashHelperService` runs at boot (harmless).
+  - **Clash Nyanpasu** 1.6.1 (mihomo v1.18.8): TCP controller 127.0.0.1:17650 with secret in its `-f`
+    config. Stopping its window can leave or restart its core: stop `mihomo.exe` processes whose command
+    line contains "Nyanpasu" too.
+  - **Plain mihomo** v1.19.32: `C:\mihomo` (`start-mihomo.cmd`, `mihomo.exe -d C:\mihomo`), TCP controller
+    127.0.0.1:9097 with a secret in `C:\mihomo\config.yaml`, mixed-port 7899.
+- Start GUI clients in the user's session with a scheduled task (`LogonType Interactive`, run once,
+  then unregister); they won't show if started from the SSH session.
+- Results 2026-10-16/17, all from China: every client found on its own (FlClash: once its secret is
+  given), short run, Ctrl+C and closing the window restore everything; win_matrix passes on Verge, Clash
+  Party, Nyanpasu and plain mihomo (the last two skip "secret").
+
 ## Open items
 
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
@@ -272,8 +300,9 @@ user says so.
   `profiles.yaml` was ignored; it had to be added in its window and the app restarted before it could be
   activated. Finding: a TCP controller also keeps the secret it started with through a config load
   (win_matrix now skips "secret" for TCP controllers and falls back to the old secret after a load).
-  Not covered: a non-English Windows (ping parsing only checked
-  offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
+  **Plain mihomo** (v1.19.32 in `C:\mihomo`, TCP controller with a secret from its `-d` config): short run,
+  Ctrl+C, close and win_matrix all pass. Clash Party re-tested on the new VM: all pass, matrix 6/6. Not
+  covered: a non-English Windows (ping parsing only checked offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
   see ROADMAP).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.

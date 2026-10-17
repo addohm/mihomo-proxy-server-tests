@@ -69,7 +69,9 @@ Then, from the test server: `ssh -p PORT WINDOWS_USER@127.0.0.1`. Re-run `tester
 for the status, a new server address, more login keys or removal. `sudo bash revtunnel-relay.sh --list`
 on the server shows every tester PC and whether it's connected.
 
-**Testing on the PC** goes through the tunnel; nobody needs to be at the PC:
+**Testing on the PC** goes through the tunnel; nobody needs to be at the PC. The current tester VM has
+Clash Verge Rev, Clash Party, FlClash, Clash Nyanpasu and a plain mihomo core installed, one running at a
+time (see CLAUDE.md, "Windows tester VM"):
 
 ```bash
 scp -r mihomo_speedtest.py mihomotest testserver/win_interrupt.py mihomo-winvm:C:/Users/USER/mst/
