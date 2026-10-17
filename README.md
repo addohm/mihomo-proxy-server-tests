@@ -17,6 +17,7 @@ python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fa
 python3 mihomo_speedtest.py --trace              # also trace the servers that don't work
 python3 mihomo_speedtest.py --save-baseline      # when everything works: keep this run to compare with
 python3 mihomo_speedtest.py --compare            # later: what changed since then
+python3 mihomo_speedtest.py --gui                # the same in your web browser
 ```
 
 On Windows, use `py` instead of `python3` (e.g. `py mihomo_speedtest.py`).
@@ -82,6 +83,18 @@ Other Notes:
 The Markdown report also lists mihomo's exact error message for each server that didn't work. Reports
 without a "Speed method" line come from older versions, whose speeds included connection setup and so read
 lower.
+
+## In your browser (`--gui`)
+
+`--gui` opens the test as a page in your normal web browser: choose servers with checkboxes, set the options,
+press **Start**, and watch the results come in. Click a column to sort, and a row for its details (the cause,
+the port check, mihomo's own error, the trace). **Stop** ends the test after the current server and restores
+your settings right away. Earlier reports open from the page too.
+
+The page is served by the script itself, on your computer only (127.0.0.1), and its address holds a random
+key, so other websites can't use it. On a server without a browser, add `--no-browser` and open the printed
+address through an SSH tunnel (`ssh -L PORT:127.0.0.1:PORT server`). Close the window (or press Ctrl+C) to
+quit; a running test is stopped and your settings restored.
 
 ## Comparing runs (`--save-baseline`, `--compare`)
 

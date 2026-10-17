@@ -47,7 +47,7 @@ size), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
 `--out DIR` (default `report.reports_dir()`: `Documents/mihomo-speedtest`, on Windows the real Documents
 folder from the registry's User Shell Folders, else `~/mihomo-speedtest`), `--save-baseline`, `--compare
-[REPORT.csv]` (see 8), `--trace` (off by default; see 6b).
+[REPORT.csv]` (see 8), `--trace` (off by default; see 6b), `--gui` (see 9) with `--no-browser`.
 
 ## Layout
 
@@ -66,7 +66,9 @@ mihomotest/
               Cymru via mihomo's DNS, whois fallback), summary / hop_list, CDN_ASNS
   report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV),
               reports_dir, load_report / compare / comparison_lines (--compare)
-  cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
+  cli.py      argparse, prerequisites output, secret prompt, terminal UI, table; --gui hands over to gui.py
+  gui.py      --gui: App (state, runs the engine in a thread), Handler (stdlib HTTP API), serve()
+  gui.html    the page (one self-contained file: no external resources; HTML/CSS/JS, polls the API)
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
               tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
               win_interrupt.py (Windows PC: Ctrl+C / close-window restore test, no desktop needed);
@@ -77,7 +79,9 @@ ROADMAP.md    planned work and every decision taken about it
 
 The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it raises `MihomoError` /
 `SecretNeeded` and reports progress through `run_tests(..., on_event)` events (`start`, `busy`, `server`,
-`pinging`, `tracing`, `stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
+`result`, `pinging`, `tracing`, `stopped`, `restored`); `should_stop()` (checked before each server) lets an
+interface stop a run. `report.finish` does the end of a run for both interfaces (comparison, reports,
+baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
 
 ## How it works
 
@@ -184,6 +188,24 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      only when every row of the saved report has the current `speed_method`. The date comes from the CSV's
      `date` column, else its file name, else its mtime. Printed after the table and saved as "Changes since
      the saved report" in the Markdown. Without a baseline, one "Tip: run with --save-baseline …" line.
+
+9. **GUI** (`--gui`, roadmap step 9, first version 2026-10-17): `gui.serve` starts a `ThreadingHTTPServer`
+   on 127.0.0.1, random port, prints the address and opens it with `webbrowser` (not with `--no-browser`).
+   Every request needs the launch's random token (`?t=` for the page, `X-Token` header for the API, so a
+   form on another site can't post) and a Host of 127.0.0.1/localhost (DNS rebinding); report names are
+   basenames of `mihomo-speedtest-*.md` only. API: `GET /api/state` (connection, servers, run: phase, live
+   results, summary, meanings, comparison, report paths), `/api/reports`, `/api/report?name=`; `POST
+   /api/connect` (address / secret: the secret prompt as a page field), `/api/run` (servers, size, timeout,
+   trace, save_baseline, compare), `/api/stop`, `/api/quit`. The run goes in a worker thread (`App._run`),
+   one at a time. **Stop** sets `should_stop` and calls `state.restore()` at once (it's idempotent; the
+   current server's test finishes through the restored selection, then the loop stops). Quit, Ctrl+C or
+   closing the console window do the same, then wait for the worker. `restore()` from a non-main thread
+   skips its signal guard (ValueError is caught). The page polls `/api/state` (1 s running, 4 s idle);
+   table sortable, a click on a row shows Note, direct check, mihomo's error, first response and trace;
+   report history opens the Markdown. Checked 2026-10-17: Linux test server (token / Host / path checks,
+   run, busy refusal, baseline, history, quit, restore) and the Windows VM from China with Clash Verge Rev
+   (run with trace, Stop after 7 s, restore, Quit; screenshots with headless Edge:
+   `msedge --headless=new --screenshot=… --window-size=1400,1050 --virtual-time-budget=4000 URL`).
 
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probes), `https://speed.cloudflare.com/__down` / `__up`.

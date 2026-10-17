@@ -36,6 +36,9 @@ Optional arguments
   --compare [FILE] after the test, show what changed since baseline.csv (or since the
                    given report .csv): servers that stopped working or work again, big
                    changes (over 30%) in speed, Conn ms or ping, new and removed servers
+  --gui            open the test as a page in your web browser (on this computer only)
+  --no-browser     with --gui: only print the page's address (e.g. on a server, through
+                   an SSH tunnel: ssh -L PORT:127.0.0.1:PORT server)
   --trace          for servers that didn't work, show where the path stops and who owns
                    each hop: a path trace for servers that don't answer ping, a TCP trace to
                    the port for those that do (Linux, run with sudo). Hop addresses are looked up
@@ -56,8 +59,7 @@ import time
 import unicodedata
 
 from .mihomo import STOP_SIGNALS, MihomoError, SecretNeeded, find_controller, list_servers
-from .report import (BASELINE, HEADERS, LEGEND, cells, compare, comparison_lines, load_report, mmss, notes, summary,
-                     reports_dir, save_reports)
+from .report import BASELINE, HEADERS, LEGEND, cells, finish, load_report, mmss, notes, reports_dir, summary
 from .system import IS_WIN, prereqs
 from .tests import RESULTS, counts, run_tests
 
@@ -225,6 +227,9 @@ def main():
                     help=f"also save this run as {BASELINE} in the report folder, to compare later runs with")
     ap.add_argument("--compare", nargs="?", const="", metavar="REPORT.csv",
                     help=f"after the test, show what changed since {BASELINE} (or since the given report)")
+    ap.add_argument("--gui", action="store_true", help="open the test as a page in your web browser")
+    ap.add_argument("--no-browser", action="store_true",
+                    help="with --gui: only print the page's address (e.g. on a server, through an SSH tunnel)")
     ap.add_argument("--trace", action="store_true",
                     help="trace the servers that didn't work and look up who owns each hop (sends hop addresses "
                          "to Team Cymru's lookup service)")
@@ -245,9 +250,6 @@ def main():
     if not check_prereqs():
         sys.exit(bad("\nPlease install what is missing above, then run again."))
 
-    ctl, version = connect(args)
-    print(f"\nConnected to mihomo {version} at {ctl}")
-
     def stop(*_):
         raise KeyboardInterrupt
     for sig in STOP_SIGNALS[1:]:  # SIGINT already raises KeyboardInterrupt
@@ -257,6 +259,12 @@ def main():
             except (OSError, ValueError):
                 pass
     close_handler = stop_on_console_close() if IS_WIN else None  # noqa: F841 - must stay referenced
+    if args.gui:
+        from .gui import serve
+        return serve(args)
+
+    ctl, version = connect(args)
+    print(f"\nConnected to mihomo {version} at {ctl}")
 
     t0 = time.time()
     try:
@@ -290,18 +298,14 @@ def main():
         print(f"Fastest download: {bold(b['name'])} ({b['down']:.1f} Mbps)")
     meta = {"date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "version": version, "api": str(ctl),
             "size": args.size, "runtime": runtime, "total": len(results), "counts": n, "meanings": RESULTS}
-    comparison = None
-    if base:
-        comparison = comparison_lines(compare(results, base[2], names_now), base[1], base[0], meta["date"])
-        print("\n" + bold(comparison[0]))
-        for line in comparison[1:]:
+    done = finish(results, meta, args.out, base, names_now, args.save_baseline)
+    if done["comparison"]:
+        print("\n" + bold(done["comparison"][0]))
+        for line in done["comparison"][1:]:
             print(bad(line) if line.startswith("Stopped") else line)
-    md, cs = save_reports(results, meta, args.out, comparison)
-    print(f"\nReports saved:\n  {md}\n  {cs}")
-    if args.save_baseline:
-        dest = os.path.join(os.path.dirname(cs), BASELINE)
-        shutil.copyfile(cs, dest)
-        print(f"Saved as the baseline: {dest}")
-    elif not os.path.isfile(base_path):
+    print(f"\nReports saved:\n  {done['md']}\n  {done['csv']}")
+    if done["baseline"]:
+        print(f"Saved as the baseline: {done['baseline']}")
+    elif done["tip"]:
         print(dim("Tip: run with --save-baseline when everything works well, so you can compare later "
                   "with --compare."))

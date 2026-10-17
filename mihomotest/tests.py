@@ -353,14 +353,16 @@ def run_traces(ctl, results, targets, conf, pool, emit):
                      + ("; Conn ms is the real latency" if r["conn"] is not None else ""))
 
 
-def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False):
+def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False, should_stop=None):
     """Test `servers` one at a time through mihomo; mihomo's state is always restored.
-    Returns (results, stopped); stopped = interrupted (Ctrl+C / SIGTERM), results then hold what was tested.
+    Returns (results, stopped); stopped = interrupted (Ctrl+C / SIGTERM, or should_stop() true before a
+    server, e.g. the GUI's Stop button), results then hold what was tested.
 
     on_event(kind, data) is called with:
       "start"    {"total", "estimate", "state"}           before the first server (state: MihomoState)
       "busy"     {"rate"}                                 other apps send > BUSY_RATE bytes/s through mihomo
       "server"   {"index", "total", "server", "left"}     a server's test begins (left: seconds, estimated)
+      "result"   {"index", "result"}                      a server's test is done (its label comes at the end)
       "pinging"  {"count"}                                all servers done, pinging them all together
       "tracing"  {"count"}                                (trace=True) tracing the servers that didn't work
       "stopped"  {}                                       interrupted
@@ -389,9 +391,12 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False):
                               "your settings are restored.)")
         logs = LogWatcher(ctl)
         for i, srv in enumerate(servers, 1):
+            if should_stop and should_stop():
+                raise KeyboardInterrupt
             left = (time.time() - t0) / (i - 1) * (len(servers) - i + 1) if i > 1 else est
             emit("server", {"index": i, "total": len(servers), "server": srv, "left": left})
             results.append(test_server(ctl, state, proxy, srv, size, timeout, up_file, logs))
+            emit("result", {"index": i, "result": results[-1]})
         # ping only now, after every transfer, so the test's own traffic doesn't inflate ping and jitter.
         # Servers mihomo never connected to: ping the address from the config, resolved by mihomo;
         # failed servers also get a direct TCP check of their port, outside mihomo

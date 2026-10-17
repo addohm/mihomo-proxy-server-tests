@@ -3,6 +3,7 @@ import csv
 import datetime
 import os
 import re
+import shutil
 import tempfile
 
 
@@ -132,6 +133,22 @@ def comparison_lines(cmp, base_date, base_path, now_date):
     if not any(cmp[k] for k in ("stopped", "recovered", "swings", "new", "gone")):
         lines.append("No big changes.")
     return lines + cmp["notes"]
+
+
+def finish(results, meta, out_dir, base=None, names_now=(), save_baseline=False):
+    """After a run: compare with a saved report (base: (path, date, rows) from load_report), save the
+    Markdown + CSV reports and, if asked, the baseline. Returns {md, csv, comparison (lines or None),
+    baseline (path or None), tip (bool: no baseline exists yet)}."""
+    comparison = None
+    if base:
+        comparison = comparison_lines(compare(results, base[2], set(names_now)), base[1], base[0], meta["date"])
+    md, cs = save_reports(results, meta, out_dir, comparison)
+    baseline = None
+    if save_baseline:
+        baseline = os.path.join(os.path.dirname(cs), BASELINE)
+        shutil.copyfile(cs, baseline)
+    return {"md": md, "csv": cs, "comparison": comparison, "baseline": baseline,
+            "tip": not save_baseline and not os.path.isfile(os.path.join(out_dir, BASELINE))}
 
 
 def save_reports(results, meta, out_dir, comparison=None):

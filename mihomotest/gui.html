@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mihomo server speed test</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#677184; --line:#e3e6ec; --accent:#2f6fde;
+          --ok:#1f8a4c; --warn:#b7791f; --bad:#c53030; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --card:#1d2128; --text:#e6e9ef; --muted:#9aa3b2; --line:#2e333d; --accent:#6c9cf0;
+            --ok:#4cc27e; --warn:#e0a84a; --bad:#f07070; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:14px 22px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--line); background:var(--card); }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  #conn { color:var(--muted); flex:1; }
+  main { display:grid; grid-template-columns: 330px minmax(0, 1fr); gap:18px; padding:18px 22px; align-items:start; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; font-weight:600; }
+  .stack > * + * { margin-top:14px; }
+  input[type=text], input[type=password], input[type=number] { width:100%; padding:6px 8px; border:1px solid var(--line);
+    border-radius:6px; background:var(--bg); color:var(--text); font:inherit; }
+  label.row { display:flex; gap:8px; align-items:flex-start; margin:6px 0; cursor:pointer; }
+  label.row small { display:block; color:var(--muted); }
+  button { font:inherit; padding:7px 14px; border-radius:7px; border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.45; cursor:default; }
+  .small { font-size:12px; color:var(--muted); }
+  #servers { max-height:340px; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:4px 8px; margin-top:8px; }
+  #servers label { display:flex; gap:8px; padding:3px 0; align-items:center; }
+  #servers .type { color:var(--muted); font-size:12px; margin-left:auto; }
+  .links a { color:var(--accent); cursor:pointer; margin-right:10px; font-size:12px; }
+  details summary { cursor:pointer; color:var(--muted); }
+  details .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px; }
+  details .grid .wide { grid-column: span 2; }
+  #status { font-weight:600; }
+  #bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; }
+  #bar div { height:100%; width:0; background:var(--accent); transition:width .4s; }
+  .restoring { color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th { color:var(--muted); font-weight:600; cursor:pointer; user-select:none; font-size:12px; }
+  th.l, td.l { text-align:left; }
+  td.name { max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+  td.note { color:var(--muted); font-size:12px; }
+  tr.r { cursor:pointer; }
+  tr.r:hover td { background:var(--bg); }
+  .lab { font-weight:600; }
+  .lab.ok { color:var(--ok); } .lab.warn { color:var(--warn); } .lab.bad { color:var(--bad); }
+  tr.detail td { white-space:normal; text-align:left; background:var(--bg); color:var(--text); }
+  tr.detail div { margin:3px 0; }
+  tr.detail b { color:var(--muted); font-weight:600; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size:12px; word-break:break-all; }
+  #meanings div { margin:4px 0; } #meanings b { margin-right:4px; }
+  #compare { white-space:pre-wrap; }
+  .error { color:var(--bad); }
+  #history a { display:block; color:var(--accent); cursor:pointer; padding:2px 0; }
+  #viewer { position:fixed; inset:5% 8%; background:var(--card); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 10px 40px rgba(0,0,0,.35); display:none; flex-direction:column; }
+  #viewer header { border-radius:10px 10px 0 0; }
+  #viewer pre { margin:0; padding:14px 18px; overflow:auto; flex:1; font:12px/1.5 ui-monospace, Consolas, monospace; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>mihomo server speed test</h1>
+  <div id="conn">Connecting…</div>
+  <button id="quit" title="Stop the program (your settings are restored if a test is running)">Quit</button>
+</header>
+<main>
+  <div class="stack">
+    <div class="card" id="connectCard" style="display:none">
+      <h2>Connect to mihomo</h2>
+      <div id="connError" class="error"></div>
+      <p class="small">Make sure your client is running. Its controller address and secret are in its settings
+        (external controller / API).</p>
+      <input type="text" id="api" placeholder="Controller address (empty: find it)">
+      <div style="height:6px"></div>
+      <input type="password" id="secret" placeholder="Secret">
+      <div style="height:8px"></div>
+      <button id="connect" class="primary">Connect</button>
+    </div>
+    <div class="card">
+      <h2>Servers</h2>
+      <input type="text" id="search" placeholder="Filter by name…">
+      <div class="links" style="margin-top:6px"><a id="all">All</a><a id="none">None</a><span class="small" id="chosen"></span></div>
+      <div id="servers"></div>
+    </div>
+    <div class="card">
+      <h2>Options</h2>
+      <label class="row"><input type="checkbox" id="trace"><span>Trace servers that don't work
+        <small>Shows where the path stops and whose network it is. About a minute more; sends hop addresses to
+        Team Cymru's public lookup service.</small></span></label>
+      <label class="row"><input type="checkbox" id="saveBaseline"><span>Save as baseline
+        <small>Keep this run to compare later runs with. Best when everything works well.</small></span></label>
+      <label class="row"><input type="checkbox" id="compare"><span>Compare with the baseline
+        <small id="compareHint">Shows what changed since the saved baseline.</small></span></label>
+      <details>
+        <summary>Advanced</summary>
+        <div class="grid">
+          <label>Download MB <input type="number" id="size" value="10" min="0.5" step="0.5"></label>
+          <label>Time limit s <input type="number" id="timeout" value="25" min="5" step="5"></label>
+          <div class="wide small">Upload is half the download size. Use a smaller size on slow connections, a larger one when
+            the Note says a transfer was too quick to time.</div>
+          <div class="wide small">Reports are saved in <code id="out"></code></div>
+        </div>
+      </details>
+    </div>
+    <div class="card">
+      <button id="start" class="primary">Start test</button>
+      <button id="stop" disabled>Stop</button>
+      <p class="small">While the test runs, TUN is turned off and mihomo is in global mode, so other apps' traffic
+        goes through the server being tested. Your settings are restored at the end, also when you stop.</p>
+    </div>
+    <div class="card">
+      <h2>Earlier reports</h2>
+      <div id="history" class="small">None yet.</div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div id="status">Choose servers and press Start.</div>
+      <div id="bar"><div></div></div>
+      <div class="small" id="sub"></div>
+    </div>
+    <div class="card">
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th data-k="i">#</th><th class="l" data-k="name">Server</th><th class="l" data-k="type">Type</th>
+          <th data-k="conn">Conn ms</th><th data-k="ping">Ping ms</th><th data-k="loss">Loss %</th>
+          <th data-k="down">Down Mbps</th><th data-k="up">Up Mbps</th><th class="l" data-k="result">Result</th>
+          <th class="l" data-k="note">Note</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="10" class="l small">No results yet. Click a row for its details.</td></tr></tbody>
+      </table></div>
+      <p class="small" id="legend"></p>
+      <div id="meanings" class="small"></div>
+      <div id="compareOut" class="small"></div>
+      <div id="reportsOut" class="small"></div>
+    </div>
+  </div>
+</main>
+<div id="viewer"><header><h1 id="viewerTitle"></h1><span style="flex:1"></span><button id="viewerClose">Close</button></header><pre id="viewerText"></pre></div>
+<script>
+const TOKEN = "{{TOKEN}}";
+const $ = id => document.getElementById(id);
+let S = null, chosen = null, sortKey = "i", sortDir = 1, open = new Set(), lastRows = "";
+const YELLOW = ["partial", "blocked", "refused", "rejected"];
+
+async function api(path, body) {
+  const opt = body === undefined ? {headers: {"X-Token": TOKEN}} :
+    {method: "POST", headers: {"X-Token": TOKEN, "Content-Type": "application/json"}, body: JSON.stringify(body)};
+  const r = await fetch(path, opt);
+  const t = r.headers.get("Content-Type") || "";
+  return t.includes("json") ? r.json() : r.text();
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const ms = v => v == null ? "-" : (v < 10 ? v.toFixed(1) : v.toFixed(0));
+const jit = (v, j) => v == null ? "-" : ms(v) + (j == null ? "" : " ±" + ms(j));
+const mmss = s => `${Math.floor(s / 60)}m${String(Math.floor(s % 60)).padStart(2, "0")}s`;
+const short = (t, n) => !t ? "" : t.length > n ? t.slice(0, n - 1) + "…" : t;
+const cls = r => r === "ok" ? "ok" : YELLOW.includes(r) ? "warn" : "bad";
+
+function renderServers() {
+  const q = $("search").value.toLowerCase();
+  if (chosen === null) chosen = new Set(S.servers.filter(s => s.selectable).map(s => s.name));
+  $("servers").innerHTML = S.servers.filter(s => s.name.toLowerCase().includes(q)).map(s =>
+    `<label><input type="checkbox" data-n="${esc(s.name)}" ${chosen.has(s.name) ? "checked" : ""}>` +
+    `<span>${esc(s.name)}</span><span class="type">${esc(s.type)}</span></label>`).join("") ||
+    `<div class="small">${S.connected ? "No server matches." : "Not connected."}</div>`;
+  $("chosen").textContent = `${chosen.size} of ${S.servers.length} chosen`;
+}
+
+function rowsHtml(results) {
+  const rs = results.map((r, i) => ({...r, i: i + 1}));
+  rs.sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir;
+  });
+  return rs.map(r => {
+    const main = `<tr class="r" data-n="${esc(r.name)}"><td>${r.i}</td><td class="l name" title="${esc(r.name)}">${esc(r.name)}</td>` +
+      `<td class="l">${esc(r.type)}</td><td>${jit(r.conn, r.conn_jitter)}</td><td>${jit(r.ping, r.ping_jitter)}</td>` +
+      `<td>${r.loss == null ? "-" : r.loss}</td><td>${r.down == null ? "-" : r.down.toFixed(1)}</td>` +
+      `<td>${r.up == null ? "-" : r.up.toFixed(1)}</td><td class="l"><span class="lab ${cls(r.result)}">${esc(r.result || "…")}</span></td>` +
+      `<td class="l note" title="${esc(r.note)}">${esc(short(r.note, 60))}</td></tr>`;
+    if (!open.has(r.name)) return main;
+    const line = (k, v, code) => v ? `<div><b>${k}:</b> ${code ? `<code>${esc(v)}</code>` : esc(v)}</div>` : "";
+    return main + `<tr class="detail"><td colspan="10">` +
+      line("Result", r.result && r.meaning ? `${r.result}: ${r.meaning}` : r.result) + line("Note", r.note) +
+      line("Direct check", r.check) + line("mihomo's error", r.error, true) +
+      line("First response", r.first == null ? "" : `${r.first.toFixed(1)} s after selecting it`) +
+      line("Trace", r.trace) + line("Hops", r.trace_hops) + `</td></tr>`;
+  }).join("");
+}
+
+function render() {
+  $("conn").innerHTML = S.connected ? `Connected to mihomo ${esc(S.version)} at <code>${esc(S.controller)}</code>` :
+    `<span class="error">Not connected</span>`;
+  $("connectCard").style.display = S.connected ? "none" : "";
+  $("connError").textContent = S.error;
+  $("out").textContent = S.out;
+  $("legend").textContent = S.legend;
+  $("compare").disabled = !S.baseline;
+  $("compareHint").textContent = S.baseline ? "Shows what changed since the saved baseline." :
+    "No baseline yet: run once with 'Save as baseline'.";
+  if (!S.baseline) $("compare").checked = false;
+  if (document.activeElement !== $("search")) renderServers();
+  const run = S.run, running = !!(run && run.running);
+  $("start").disabled = running || !S.connected; $("stop").disabled = !running;
+  $("connect").disabled = running;
+  if (!run) return;
+  const done = run.results.length, total = run.total || 1;
+  const phase = {starting: "Preparing…", testing: `Testing ${run.index} of ${run.total}: ${run.current}`,
+    pinging: "Pinging every server…", tracing: "Tracing the servers that didn't work…",
+    restoring: "Stopping: restoring your settings…", restored: "Your settings are restored. Finishing…",
+    done: run.error ? "The test couldn't run" : run.stopped ? "Stopped: showing the servers tested so far" : "Done"}[run.phase] || run.phase;
+  $("status").textContent = phase;
+  $("status").className = run.phase === "restoring" ? "restoring" : run.error ? "error" : "";
+  $("bar").firstElementChild.style.width = (running ? Math.min(98, 100 * done / total) : 100) + "%";
+  $("sub").textContent = run.error ? run.error : running ? (run.left ? `about ${mmss(run.left)} left` : "") :
+    run.summary ? `${run.summary} in ${run.runtime}` : "";
+  const html = rowsHtml(run.results);
+  if (html !== lastRows) { $("rows").innerHTML = html || `<tr><td colspan="10" class="l small">Testing the first server…</td></tr>`; lastRows = html; }
+  $("meanings").innerHTML = run.meanings && run.meanings.length ? "<p><b>What the results mean</b></p>" +
+    run.meanings.map(m => { const i = m.indexOf(":"); return `<div><b>${esc(m.slice(0, i))}</b>${esc(m.slice(i + 1))}</div>`; }).join("") : "";
+  $("compareOut").innerHTML = run.comparison ? `<p><b>${esc(run.comparison[0])}</b></p><div id="compare">${esc(run.comparison.slice(1).join("\n"))}</div>` : "";
+  const rp = run.reports;
+  $("reportsOut").innerHTML = rp ? `<p>Reports saved: <code>${esc(rp.md)}</code><br><code>${esc(rp.csv)}</code>` +
+    (rp.baseline ? `<br>Saved as the baseline: <code>${esc(rp.baseline)}</code>` : "") +
+    (rp.tip ? `<br>Tip: when everything works well, run once with “Save as baseline” to compare later.` : "") + "</p>" : "";
+}
+
+async function refresh() {
+  try { S = await api("/api/state"); render(); } catch (e) { $("conn").innerHTML = `<span class="error">The program isn't running any more.</span>`; }
+  setTimeout(refresh, S && S.run && S.run.running ? 1000 : 4000);
+}
+async function history() {
+  const list = await api("/api/reports");
+  $("history").innerHTML = list.length ? list.map(r => `<a data-r="${esc(r.name)}">${esc(r.date.replace(/(\d{4})(\d\d)(\d\d) (\d\d)(\d\d)(\d\d)/, "$1-$2-$3 $4:$5"))}</a>`).join("") : "None yet.";
+}
+
+$("servers").addEventListener("change", e => { const n = e.target.dataset.n; if (!n) return;
+  e.target.checked ? chosen.add(n) : chosen.delete(n); $("chosen").textContent = `${chosen.size} of ${S.servers.length} chosen`; });
+$("search").addEventListener("input", renderServers);
+$("all").onclick = () => { $("servers").querySelectorAll("input").forEach(c => chosen.add(c.dataset.n)); renderServers(); };
+$("none").onclick = () => { $("servers").querySelectorAll("input").forEach(c => chosen.delete(c.dataset.n)); renderServers(); };
+$("start").onclick = async () => {
+  open.clear(); lastRows = "";
+  const r = await api("/api/run", {servers: [...chosen], trace: $("trace").checked, save_baseline: $("saveBaseline").checked,
+    compare: $("compare").checked, size: $("size").value, timeout: $("timeout").value});
+  if (r.error) alert(r.error);
+  S = await api("/api/state"); render(); setTimeout(history, 500);
+};
+$("stop").onclick = () => api("/api/stop", {});
+$("connect").onclick = async () => { chosen = null; S = await api("/api/connect", {api: $("api").value, secret: $("secret").value}); render(); };
+$("quit").onclick = async () => {
+  if (S && S.run && S.run.running && !confirm("A test is running. Stop it, restore your settings and quit?")) return;
+  await api("/api/quit", {}); document.body.innerHTML = "<p style='padding:30px'>The program has stopped. You can close this tab.</p>";
+};
+document.querySelector("thead").addEventListener("click", e => { const k = e.target.dataset.k; if (!k) return;
+  sortDir = sortKey === k ? -sortDir : 1; sortKey = k; lastRows = ""; render(); });
+$("rows").addEventListener("click", e => { const tr = e.target.closest("tr.r"); if (!tr) return;
+  const n = tr.dataset.n; open.has(n) ? open.delete(n) : open.add(n); lastRows = ""; render(); });
+$("history").addEventListener("click", async e => { const n = e.target.dataset.r; if (!n) return;
+  $("viewerTitle").textContent = n; $("viewerText").textContent = await api("/api/report?name=" + encodeURIComponent(n));
+  $("viewer").style.display = "flex"; });
+$("viewerClose").onclick = () => $("viewer").style.display = "none";
+refresh(); history();
+setInterval(() => { if (S && S.run && !S.run.running) history(); }, 15000);
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ nothing here is started until the user says so. Done items are removed (see git 
 6. ~~`--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)~~ — done 2026-10-17
 7. ~~Per-user reports folder + baseline / `--compare`~~ — done 2026-10-17
 8. ~~Clearer result labels~~ — done 2026-10-17
-9. GUI (local web page)
+9. GUI (local web page) — first version 2026-10-17 (`--gui`); packaged "double-click → GUI" comes with step 10
 10. Packaging + releases
 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
@@ -81,6 +81,12 @@ since a filtered baseline can't tell the two apart; small swings need at least 2
   label that appears; summary "N ok, N blocked, … of N servers". Details in CLAUDE.md, "How it works" 7.
 
 ## 9–10. GUI and packaging (decided 2026-10-15)
+
+First GUI version done 2026-10-17 (`mihomotest/gui.py` + `gui.html`; CLAUDE.md "How it works" 9): server
+checkboxes with search, trace / baseline / compare up front, size and time limit under Advanced, the secret
+as a page field when needed, live sortable table with per-row details, status with a "restoring your
+settings" phase, Stop (restores at once), report history, Quit. Still to do for step 9 after the user has
+tried it: feedback; the packaged program opening it on a double-click is part of step 10.
 
 - **GUI as a local web page.** The program runs a small stdlib web server and opens a page in the user's
   normal browser: live results table, server checkboxes instead of `--filter`, sortable columns, a
