@@ -6,8 +6,8 @@ with its jitter. For servers that don't work it shows why: mihomo's own error (e
 "config error") plus a direct check of the server's port (blocked, refused, or reachable). It also flags
 servers that are slow to start, tests disturbed by other apps' traffic, and servers behind Cloudflare's CDN
 (whose ping shows the CDN, not the server). With `--trace` it also shows where the path to a server that
-doesn't work stops, and whose network that is. Works with any mihomo-based client (Clash Verge Rev, Mihomo
-Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with servers listed in the config or loaded from
+doesn't work stops, and whose network that is. Works with any mihomo-based client (Clash Verge Rev, Clash
+Party (formerly Mihomo Party), Clash Nyanpasu, FlClash, ClashX Meta, plain mihomo), with servers listed in the config or loaded from
 proxy providers.
 
 ```bash
@@ -134,12 +134,14 @@ stops to the Note, with the network that owns that hop (e.g. "path trace: stops 
   secret the script can't read from FlClash's settings, so it asks for it (or pass `--secret`). If the
   client isn't started, the script stops with "mihomo isn't passing connections … is your client
   started?" instead of reporting every server as not working.
-- **Clash Verge Rev**, **Clash Party**, **Clash Nyanpasu**: found on their own, no settings needed (Nyanpasu's
-  controller secret is read from its config, which needs PyYAML; without it the script asks for it).
+- **Clash Verge Rev**, **Clash Party**, **Clash Nyanpasu**, **plain mihomo**: found on their own, no settings
+  needed (Nyanpasu's and plain mihomo's controller secret is read from their config, which needs PyYAML;
+  without it the script asks for it). On Windows this also works from a normal (not administrator) window,
+  including Clash Verge Rev's service mode.
 
 ## Requirements
 
-Python 3.8+, `curl` and `ping`. PyYAML is optional. For `--trace`: `tracert` (built into Windows),
+Python 3.8+, `curl` and `ping`. PyYAML is optional. `--gui` needs only a web browser. For `--trace`: `tracert` (built into Windows),
 `tracepath` or `traceroute` (Linux; port traces: `traceroute` or `mtr`, and sudo), `traceroute` (macOS).
 Run with `--help` for all options.
 
@@ -147,6 +149,13 @@ Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script run
 
 Status: in use on Linux. Windows: tested with Clash Verge Rev, Clash Party, FlClash, Clash Nyanpasu and a
 plain mihomo core (named pipe or TCP controller, TUN on or off, different proxy ports, with or without
-PyYAML), from mainland China. macOS support is written but not yet tested.
+PyYAML), from mainland China. The browser page (`--gui`) is a first version. macOS support is written but
+not yet tested. There are no downloadable builds yet: run it from the source with Python.
+
+## Reporting a problem
+
+Please include: the operating system, the client and its version (e.g. Clash Verge Rev 2.4), how it was
+run (the command line, or `--gui`), everything the script printed, and the Markdown report (its "Failure
+details" section has mihomo's own error messages). Server addresses in reports can be removed by hand.
 
 Planned features: see [ROADMAP.md](ROADMAP.md).

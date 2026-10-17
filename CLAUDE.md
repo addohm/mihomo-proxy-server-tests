@@ -320,6 +320,13 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
+- **Paused 2026-10-17 by the user**, who is testing on various platforms. Roadmap steps 1–8 done, step 9
+  (GUI) first version done; next: the user's findings, then step 10 (packaging). Nothing in progress. When
+  work resumes, ask for those findings first. Not yet covered by tests: the GUI on macOS or a Linux
+  desktop, the GUI with FlClash (its secret field) and with a TCP controller, a non-English Windows, macOS
+  at all. The VM is in its normal state (Clash Verge Rev at login, TUN off, current code in
+  `C:\Users\addohm\mst`); the user ran the GUI there after the pipe-list fix (a report from 2026-10-16 23:11
+  VM time is in its Documents).
 - **Windows** (roadmap step 5), first runs on the VM 2026-10-16 (Clash Verge Rev in service mode, mihomo
   v1.19.32, Python 3.15, no PyYAML, en-US, from mainland China): `Get-CimInstance` discovery finds the core
   in session 0 and its per-user pipe `\\.\pipe\verge-mihomo-production-<hash>` from `-ext-ctl-pipe` (the
@@ -366,7 +373,9 @@ user says so.
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.
 - Runs so far: the test server (full runs of all 45 servers on 2026-10-16 before and after step 3, 42 ok
-  both times, restore verified, ~5.5 → ~8 min with the connection probes; the matrix), and the Windows VM
-  with Clash Verge Rev from mainland China: full run of all 43 servers on 2026-10-16 (16.5 min, 25 ok,
-  15 unreachable, 3 failed, restored; the trojan servers on port 43000 answer ping but their port gets no
-  answer, through mihomo and directly: blocked on that network), no "busy" flags, and the short runs above.
+  both times, restore verified, ~5.5 → ~8 min with the connection probes; the matrix, last 8 of 8 on
+  2026-10-17 after the GUI changes), and the Windows VM with Clash Verge Rev from mainland China: full run
+  of all 43 servers on 2026-10-16 (16.5 min, 25 ok, 15 unreachable, 3 failed — before step 8's labels, so
+  today mostly `blocked`; restored; the trojan servers on port 43000 answer ping but their port gets no
+  answer, through mihomo and directly), no "busy" flags, and the short runs above (incl. `--trace`,
+  `--compare`, the new labels, the GUI elevated and the CLI as a normal user).

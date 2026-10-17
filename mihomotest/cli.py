@@ -4,7 +4,7 @@ mihomo_speedtest.py - test every server in your running mihomo, exactly as mihom
 Just run it:   python mihomo_speedtest.py
 
 What it does
-  1. Finds your running mihomo (any client: Clash Verge Rev, Mihomo Party, Nyanpasu,
+  1. Finds your running mihomo (any client: Clash Verge Rev, Clash Party, Nyanpasu,
      FlClash, ClashX Meta, plain mihomo...) through its external-controller API.
   2. Temporarily turns TUN off and switches mihomo to global mode.
   3. For each server: selects it, times 5 new connections through it (Conn ms), then

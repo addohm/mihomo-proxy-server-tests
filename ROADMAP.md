@@ -21,6 +21,10 @@ nothing here is started until the user says so. Done items are removed (see git 
 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
 
+**Status 2026-10-17: paused by the user**, who is testing on various platforms. Steps 1–8 are done, step 9
+has a first version (`--gui`). Next, when work resumes: the user's findings from that testing (fixes and
+GUI changes), then step 10 (packaging). Nothing is in progress or uncommitted.
+
 ## 6. Traceroute on failure (`--trace`)
 
 Done 2026-10-17 as decided below (`mihomotest/trace.py`; details in CLAUDE.md, "How it works" 6b). Checked on
