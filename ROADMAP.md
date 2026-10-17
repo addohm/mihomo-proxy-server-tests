@@ -9,8 +9,10 @@ nothing here is started until the user says so. Done items are removed (see git 
 2. ~~Diagnosis: mihomo's failure reason, direct TCP check (+ provider file lookup), slow-start flag~~ — done
 3. ~~Accuracy: connection probes + both jitters, 10 pings at the end, transfer-only speed, other-traffic
    flag, CDN labels, table layout rework~~ — done
-4. Remote tester inside China (reverse SSH tunnel; see the section below)
-5. ~~Windows paths: test and fix on the China tester / the Windows 11 VM~~ — done 2026-10-16 (Clash Verge Rev)
+4. ~~Remote tester inside China (reverse SSH tunnel; see the section below)~~ — done 2026-10-17 (Windows 11 VM
+   through revtunnel; full run from China, all tests run on it, survives reboots)
+5. ~~Windows paths: test and fix on the China tester / the Windows 11 VM~~ — done 2026-10-17 (Clash Verge
+   Rev, Clash Party, FlClash, Clash Nyanpasu, plain mihomo)
 6. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
 7. Per-user reports folder + baseline / `--compare`
 8. Clearer result labels
