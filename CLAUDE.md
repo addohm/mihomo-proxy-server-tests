@@ -45,7 +45,7 @@ python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 Options: `--filter REGEX`, `--size MB` (default 10; upload is half; the only way to change the transfer
 size), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
-`--out DIR` (default: next to the script).
+`--out DIR` (default: next to the script), `--trace` (off by default; see step 6b below).
 
 ## Layout
 
@@ -60,6 +60,8 @@ mihomotest/
               ranges), test_server (warm-up, connection probes, transfers, other traffic), failure
               cause (dial_error, classify, CAUSES), run_tests (the run loop, end-of-run pings) +
               estimate/counts
+  trace.py    --trace: trace / parse_hops (tracert, tracepath, traceroute, mtr output), owners (Team
+              Cymru via mihomo's DNS, whois fallback), summary / hop_list, CDN_ASNS
   report.py   cells/notes formatting (value ±jitter), LEGEND, SPEED_METHOD, save_reports (Markdown + CSV)
   cli.py      argparse, prerequisites output, secret prompt, terminal UI, table
 testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "Remote test server");
@@ -72,7 +74,7 @@ ROADMAP.md    planned work and every decision taken about it
 
 The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it raises `MihomoError` /
 `SecretNeeded` and reports progress through `run_tests(..., on_event)` events (`start`, `busy`, `server`,
-`pinging`, `stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
+`pinging`, `tracing`, `stopped`, `restored`). Interfaces (the CLI now, the GUI later) handle output. Keep it that way.
 
 ## How it works
 
@@ -137,10 +139,22 @@ The engine (`mihomo`, `tests`, `report`) never prints, prompts or exits: it rais
      protocols (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the
      config's `proxies` plus its proxy-provider files (`path`, relative to the config's directory).
    - **CDN label**: if the pinged IP is in Cloudflare's published ranges (`CLOUDFLARE`, 22 prefixes, built
-     in) → "via Cloudflare CDN: ping shows the CDN edge, not the server". Other CDNs only by network owner
-     once `--trace` does owner lookups (roadmap step 6).
+     in) → "via Cloudflare CDN: ping shows the CDN edge, not the server". With `--trace`, other CDNs by network
+     owner (`trace.CDN_ASNS`: Fastly, Akamai, CDN77, Gcore, Bunny, Edgio; AWS/CloudFront isn't, its AS is
+     all of AWS).
    - Pings and checks run in a thread pool; queued ones are cancelled on Ctrl+C.
    - Process list, config-file list and parsed YAML are cached (`lru_cache`), so each is read once per run.
+6b. **`--trace`** (`run_traces`, still in test mode with TUN off, after the pings): "failed" servers get a
+   path trace (`tracert -d` / `tracepath -n` / macOS `traceroute -n`, ≤ 20 hops), "unreachable" ones a TCP
+   trace to the proxy port (Linux as root with `traceroute -T` or `mtr --tcp`; otherwise the Note says
+   "run with sudo", on Windows "not available"; UDP protocols: not possible); failed servers whose direct
+   check says "no route" aren't traced. `parse_hops` reads every tool's output in any language (a line
+   starting with the hop number, then the first IP). Owners: Team Cymru TXT records (`origin.asn` /
+   `AS<n>.asn`) through mihomo's `/dns/query` (works from China), else `whois.cymru.com:43` bulk; private
+   / CGNAT hops are labelled, not looked up. Note: one-line `summary` ("stops after hop 11: IP (AS3257
+   GTT-BACKBONE)", "reaches the server (13 hops)", "no answer from the server within 20 hops; last hop: …");
+   Markdown "Traces" section: the whole `hop_list` (runs of `*` collapsed); CSV `trace` column. Traces run
+   in parallel in the ping pool: about 1 min extra. Hop addresses go to Team Cymru (documented).
 7. Results: `ok`, `partial`, `unreachable` (no proxy connection but answers ping), `failed` (neither).
    Labels stay these four for now (clearer labels are roadmap step 8); the cause and the direct check go in
    the Note (e.g. "connection timed out; direct check: port 43000 no answer"). `UNREACHABLE_NOTE` /

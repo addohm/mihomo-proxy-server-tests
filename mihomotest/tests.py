@@ -11,6 +11,7 @@ import statistics
 import tempfile
 import time
 
+from . import trace as tracing
 from .mihomo import LogWatcher, MihomoError, MihomoState, config_servers, mihomo_resolve, remote_ip, traffic_total
 from .system import CURL, IS_MAC, IS_WIN, NULL_DEV, run
 
@@ -168,7 +169,7 @@ def add_note(r, text):
 def test_server(ctl, state, proxy, srv, size, timeout, up_file, logs):
     r = {"name": srv["name"], "type": srv["type"], "ip": None, "ping": None, "loss": None, "ping_jitter": None,
          "conn": None, "conn_jitter": None, "down": None, "up": None, "first": None, "other": None, "short": [],
-         "result": "", "note": "", "error": "", "check": ""}
+         "result": "", "note": "", "error": "", "check": "", "trace": "", "trace_hops": ""}
     mark = logs.mark()
     if not state.select(srv):
         r["result"], r["note"] = "failed", ("mihomo would not select this server" if srv.get("path")
@@ -271,7 +272,41 @@ def other_traffic(ctl, seconds=2):
     return None if before is None or after is None else max(after - before, 0) / seconds
 
 
-def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
+def run_traces(ctl, results, targets, conf, pool, emit):
+    """--trace: a path trace for "failed" servers, a TCP trace to the proxy port for "unreachable" ones (ping
+    already gets through there), then the network owner of every hop and server address. Summary in the Note
+    and r["trace"], whole trace in r["trace_hops"]; servers on a known CDN (by owner) get a CDN note."""
+    jobs = {}
+    for r in results:
+        ip = targets.get(r["name"])
+        if r["result"] == "failed" and ip:
+            if r["check"].endswith("no route"):  # nowhere to trace to (e.g. an IPv6 server, no IPv6 here)
+                r["trace"] = "not traced: no route to the server"
+            else:
+                jobs[r["name"]] = pool.submit(tracing.trace, ip)
+        elif r["result"] == "unreachable" and ip:
+            port = (conf.get(r["name"]) or {}).get("port")
+            if r["type"] in UDP_TYPES:
+                r["trace"] = "port trace: not possible (UDP)"
+            elif port:
+                jobs[r["name"]] = pool.submit(tracing.trace, ip, port)
+    emit("tracing", {"count": len(jobs)})
+    traces = {name: fut.result() for name, fut in jobs.items()}
+    hops = {h for t in traces.values() for _, h in t.get("hops", []) if h}
+    own = tracing.owners(ctl, hops | set(targets.values()), pool)
+    for r in results:
+        t = traces.get(r["name"])
+        if t:
+            r["trace"], r["trace_hops"] = tracing.summary(t, own), tracing.hop_list(t, own)
+        if r.get("trace"):
+            add_note(r, r["trace"])
+        o = own.get(targets.get(r["name"]) or "")
+        if o and o[0] in tracing.CDN_ASNS:
+            add_note(r, f"via {tracing.CDN_ASNS[o[0]]} CDN: ping shows the CDN edge, not the server"
+                     + ("; Conn ms is the real latency" if r["conn"] is not None else ""))
+
+
+def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False):
     """Test `servers` one at a time through mihomo; mihomo's state is always restored.
     Returns (results, stopped); stopped = interrupted (Ctrl+C / SIGTERM), results then hold what was tested.
 
@@ -280,6 +315,7 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
       "busy"     {"rate"}                                 other apps send > BUSY_RATE bytes/s through mihomo
       "server"   {"index", "total", "server", "left"}     a server's test begins (left: seconds, estimated)
       "pinging"  {"count"}                                all servers done, pinging them all together
+      "tracing"  {"count"}                                (trace=True) tracing the servers that didn't work
       "stopped"  {}                                       interrupted
       "restored" {"state"}                                mihomo is back to its previous state
     """
@@ -345,6 +381,8 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None):
             if cloudflare(targets.get(r["name"]) or ""):
                 add_note(r, "via Cloudflare CDN: ping shows the CDN edge, not the server"
                          + ("; Conn ms is the real latency" if r["conn"] is not None else ""))
+        if trace:
+            run_traces(ctl, results, targets, conf, pinger, emit)
     except KeyboardInterrupt:
         stopped = True
         emit("stopped", {})

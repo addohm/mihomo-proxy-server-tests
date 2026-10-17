@@ -14,7 +14,7 @@ What it does
      apps' traffic that shared the server during its test.
   4. After all transfers, pings every server address mihomo actually connected to
      (10 pings each). Servers behind Cloudflare's CDN are labelled: their ping shows
-     the CDN edge, not the server.
+     the CDN edge, not the server. With --trace, traces the servers that didn't work.
   5. Restores TUN, mode and your server selections (also on Ctrl+C, or on Windows when the
      window is closed), prints the results and saves a Markdown and a CSV report.
 
@@ -25,10 +25,15 @@ Optional arguments
   --filter REGEX   only test servers whose name matches
   --size MB        download size per server (upload is half). Default 10. Raise it
                    (e.g. 50) when the Note says a transfer was too quick to time
+  --timeout SEC    max seconds per transfer. Default 25
   --api ADDR       controller address if it is not found automatically
                    (127.0.0.1:9090, unix:/path/to.sock or \\\\.\\pipe\\name)
   --secret TEXT    controller secret (or set MIHOMO_SECRET; asked for if needed)
   --out DIR        where to save the reports (default: next to mihomo_speedtest.py)
+  --trace          for servers that didn't work, show where the path stops and who owns
+                   each hop: a path trace for "failed" servers, a TCP trace to the port for
+                   "unreachable" ones (Linux, run with sudo). Hop addresses are looked up
+                   with Team Cymru's ASN service (through mihomo's DNS, else whois.cymru.com).
 """
 import argparse
 import datetime
@@ -161,6 +166,8 @@ def on_event(kind, data):
                    "are marked 'busy' in the Note."))
     elif kind == "pinging":
         status_line(f"Pinging {data['count']} servers...")
+    elif kind == "tracing":
+        status_line(f"Tracing {data['count']} servers that didn't work (up to ~1 min)...")
     elif kind == "stopped":
         clear_status()
         print(warn("\nStopped - showing the servers tested so far."))
@@ -207,6 +214,9 @@ def main():
     ap.add_argument("--api", help="controller address, if not found automatically")
     ap.add_argument("--secret", default="", help="controller secret (or MIHOMO_SECRET)")
     ap.add_argument("--out", default=APP_DIR, help="report folder")
+    ap.add_argument("--trace", action="store_true",
+                    help="trace the servers that didn't work and look up who owns each hop (sends hop addresses "
+                         "to Team Cymru's lookup service)")
     args = ap.parse_args()
 
     print(bold("mihomo server speed test\n"))
@@ -234,7 +244,7 @@ def main():
             servers = [s for s in servers if rx.search(s["name"])]
         if not servers:
             sys.exit(bad("mihomo reports no servers to test."))
-        results, _ = run_tests(ctl, servers, args.size, args.timeout, on_event)
+        results, _ = run_tests(ctl, servers, args.size, args.timeout, on_event, trace=args.trace)
     except MihomoError as e:
         sys.exit(bad(str(e)))
 

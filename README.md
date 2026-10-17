@@ -5,7 +5,8 @@ connection time and download/upload speed through mihomo, and ping to the addres
 with its jitter. For servers that don't work it shows why: mihomo's own error (e.g. "connection timed out",
 "config error") plus a direct check of the server's port (blocked, refused, or reachable). It also flags
 servers that are slow to start, tests disturbed by other apps' traffic, and servers behind Cloudflare's CDN
-(whose ping shows the CDN, not the server). Works with any mihomo-based client (Clash Verge Rev, Mihomo
+(whose ping shows the CDN, not the server). With `--trace` it also shows where the path to a server that
+doesn't work stops, and whose network that is. Works with any mihomo-based client (Clash Verge Rev, Mihomo
 Party, Nyanpasu, FlClash, ClashX Meta, plain mihomo), with servers listed in the config or loaded from
 proxy providers.
 
@@ -13,6 +14,7 @@ proxy providers.
 python3 mihomo_speedtest.py                      # test everything
 python3 mihomo_speedtest.py --filter "Japan"     # only matching servers
 python3 mihomo_speedtest.py --size 50            # bigger transfers, for very fast servers/connections
+python3 mihomo_speedtest.py --trace              # also trace the servers that don't work
 ```
 
 On Windows, use `py` instead of `python3` (e.g. `py mihomo_speedtest.py`).
@@ -68,6 +70,21 @@ The Markdown report also lists mihomo's exact error message for each server that
 without a "Speed method" line come from older versions, whose speeds included connection setup and so read
 lower.
 
+## Tracing servers that don't work (`--trace`)
+
+With `--trace`, after the test the script traces every server that didn't work and adds where the path
+stops to the Note, with the network that owns that hop (e.g. "path trace: stops after hop 11: 141.136.111.46
+(AS3257 GTT-BACKBONE)"). The Markdown report lists every hop.
+
+- **failed** servers get a path trace (`tracert`, `tracepath` or `traceroute`).
+- **unreachable** servers answer ping, so a path trace would tell nothing; they get a trace to their proxy
+  port instead, which needs Linux and sudo (`sudo python3 mihomo_speedtest.py --trace`) with `traceroute` or
+  `mtr` installed. "reaches the server" means the port is reachable and the problem is in the connection
+  itself (e.g. credentials, TLS); "stops after hop N" shows where it's blocked.
+- Servers whose address belongs to a CDN such as Fastly or Akamai are labelled like Cloudflare ones.
+- Takes about a minute more. **Privacy:** hop and server addresses are looked up in Team Cymru's public
+  ASN service (through mihomo's DNS, or `whois.cymru.com`); without `--trace` nothing is sent.
+
 ## Client notes
 
 - **FlClash**: turn on *External controller* in its settings and press *Start*. Its controller has a
@@ -79,12 +96,14 @@ lower.
 
 ## Requirements
 
-Python 3.8+, `curl` and `ping`. PyYAML is optional. Run with `--help` for all options.
+Python 3.8+, `curl` and `ping`. PyYAML is optional. For `--trace`: `tracert` (built into Windows),
+`tracepath` or `traceroute` (Linux; port traces: `traceroute` or `mtr`, and sudo), `traceroute` (macOS).
+Run with `--help` for all options.
 
 Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script runs the code in that folder.
 
-Status: in use on Linux. Windows: tested with Clash Verge Rev (named pipe, TUN on or off, different
-proxy ports, with or without PyYAML); other Windows clients not yet. macOS support is written but not yet
-tested.
+Status: in use on Linux. Windows: tested with Clash Verge Rev, Clash Party, FlClash, Clash Nyanpasu and a
+plain mihomo core (named pipe or TCP controller, TUN on or off, different proxy ports, with or without
+PyYAML), from mainland China. macOS support is written but not yet tested.
 
 Planned features: see [ROADMAP.md](ROADMAP.md).

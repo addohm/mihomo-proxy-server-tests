@@ -71,6 +71,10 @@ def save_reports(results, meta, out_dir):
     lines += ["", f"> {LEGEND}"]
     for note in notes(meta):
         lines += ["", f"> {note}"]
+    traced = [r for r in results if r.get("trace_hops")]
+    if traced:
+        lines += ["", "## Traces", "", "Hop by hop (`*` = no answer), with each hop's network owner:", ""]
+        lines += [f"- **{r['name']}**: {r['trace']}  \n  {r['trace_hops']}" for r in traced]
     errors = [r for r in results if r.get("error")]
     if errors:
         lines += ["", "## Failure details", "", "mihomo's own error message for each server that didn't work:", ""]
@@ -81,11 +85,11 @@ def save_reports(results, meta, out_dir):
         w = csv.writer(f)
         w.writerow(["server", "type", "conn_ms", "conn_jitter_ms", "ping_ms", "ping_jitter_ms", "loss_pct",
                     "download_mbps", "upload_mbps", "result", "note", "first_response_s", "direct_check",
-                    "other_traffic_mb", "mihomo_error", "speed_method"])
+                    "other_traffic_mb", "mihomo_error", "speed_method", "trace"])
         num = lambda v, nd: "" if v is None else round(v, nd)
         for r in results:
             w.writerow([r["name"], r["type"], num(r["conn"], 1), num(r["conn_jitter"], 1), num(r["ping"], 1),
                         num(r["ping_jitter"], 1), "" if r["loss"] is None else r["loss"],
                         num(r["down"], 2), num(r["up"], 2), r["result"], r["note"], num(r["first"], 1),
-                        r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"], SPEED_METHOD])
+                        r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"], SPEED_METHOD, r.get("trace", "")])
     return md_path, csv_path

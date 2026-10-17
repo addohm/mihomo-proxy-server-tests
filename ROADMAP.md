@@ -13,7 +13,7 @@ nothing here is started until the user says so. Done items are removed (see git 
    through revtunnel; full run from China, all tests run on it, survives reboots)
 5. ~~Windows paths: test and fix on the China tester / the Windows 11 VM~~ — done 2026-10-17 (Clash Verge
    Rev, Clash Party, FlClash, Clash Nyanpasu, plain mihomo)
-6. `--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)
+6. ~~`--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)~~ — done 2026-10-17
 7. Per-user reports folder + baseline / `--compare`
 8. Clearer result labels
 9. GUI (local web page)
@@ -22,6 +22,13 @@ nothing here is started until the user says so. Done items are removed (see git 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
 
 ## 6. Traceroute on failure (`--trace`)
+
+Done 2026-10-17 as decided below (`mihomotest/trace.py`; details in CLAUDE.md, "How it works" 6b). Checked on
+the Linux test server as root (path trace, TCP port traces with `mtr`, owners through mihomo's DNS) and
+without root ("run with sudo"), and on the Windows VM from mainland China (`tracert`, owners through Clash
+Verge Rev's DNS, "not available on Windows" for port traces). Also: servers whose direct check says "no
+route" aren't traced; a trace that runs out of hops says so instead of "stops". GUI (per-server button) is
+step 9.
 
 - An ICMP trace is useless for "unreachable" servers (ICMP already gets through); they need a TCP trace to
   the proxy port. An ICMP trace is still useful for "failed" servers.
