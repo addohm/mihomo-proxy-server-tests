@@ -15,6 +15,7 @@ from .report import BASELINE, LEGEND, finish, load_report, mmss, notes, reports_
 from .tests import RESULTS, WORKING, counts, run_tests
 
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gui.html")
+IDLE_QUIT = 300
 FIELDS = ("name", "type", "conn", "conn_jitter", "ping", "ping_jitter", "loss", "down", "up", "first", "result",
           "note", "error", "check", "trace", "trace_hops")
 
@@ -171,6 +172,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         token = self.headers.get("X-Token") or (query.get("t") or [""])[0]
         return self._ok_host() and secrets.compare_digest(token, self.app.token)
 
+    def log_request(self, *_):  # every request: a page is open (see serve's idle check)
+        Handler.last_seen = time.time()
+
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(url.query)
@@ -208,8 +212,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.app.stop_now()
             return self._send(200, {"error": ""})
         if url.path == "/api/quit":
+            self._send(200, {"error": ""})  # reply first: the program may end as soon as quit is set
+            self.wfile.flush()
             self.app.quit.set()
-            return self._send(200, {"error": ""})
+            return None
         self._send(404, {"error": "not found"})
 
 
@@ -225,9 +231,15 @@ def serve(args, port=0):
           "Close this window (or press Ctrl+C) to quit.", flush=True)
     if not args.no_browser:
         webbrowser.open(url)
+    Handler.last_seen = time.time()
     try:
         while not app.quit.wait(0.5):
-            pass
+            # Started by a double-click there may be no window to close: quit once no page has asked for
+            # anything for IDLE_QUIT seconds (it asks every few seconds; background tabs at least once a minute)
+            if getattr(args, "idle_quit", False) and time.time() - Handler.last_seen > IDLE_QUIT and not (
+                    app.worker and app.worker.is_alive()):
+                print("The page has been closed for a while: quitting.")
+                break
     except KeyboardInterrupt:
         pass
     finally:

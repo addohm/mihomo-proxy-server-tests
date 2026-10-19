@@ -73,7 +73,10 @@ testserver/   remote test server tooling: setup.sh, variant.py, matrix.py (see "
               tester-windows.cmd (revtunnel preset for a Windows tester PC, roadmap step 4);
               win_interrupt.py (Windows PC: Ctrl+C / close-window restore test, no desktop needed);
               win_matrix.py (Windows PC: config variants loaded through the API, like matrix.py);
+              ci_smoke.py (any OS: packaged program vs. a stand-in mihomo; run by GitHub Actions);
               README.md (workflow and usage of all of these)
+packaging/    build.py (PyInstaller build for the current OS -> dist/release/), requirements.txt (pinned)
+.github/workflows/build.yml   build + smoke test on 4 runners; release on a v* tag (see 10)
 ROADMAP.md    planned work and every decision taken about it
 ```
 
@@ -211,6 +214,28 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    (run with trace, Stop after 7 s, restore, Quit; screenshots with headless Edge:
    `msedge --headless=new --screenshot=… --window-size=1400,1050 --virtual-time-budget=4000 URL`).
 
+10. **Packaged program** (roadmap step 10, 2026-10-19): `packaging/build.py` runs PyInstaller (versions pinned
+   in `packaging/requirements.txt`, PyYAML bundled; `gui.html` added as data, found next to `gui.py` as
+   before). Windows: one console `.exe`; Linux: one file, built on Ubuntu 22.04 (glibc 2.35+); macOS: a
+   `.app` (onedir, `--windowed`), `LSUIElement` set (no Dock icon; the page is the UI), re-signed ad-hoc,
+   zipped with `ditto`. Names `mihomo-speedtest-VERSION-{windows-x64.exe,linux-x64,macos-arm64.zip,
+   macos-x64.zip}`; version from `mihomotest.__version__` (`--version`). `cli.main`: when `sys.frozen` and no
+   arguments (macOS `-psn_*` ignored) it runs as `--gui` with `args.idle_quit`: the server quits once no
+   request came for `gui.IDLE_QUIT` (300 s) and no test runs (no console to close on macOS); on Windows an
+   error exit in that mode waits for Enter so the window can be read. Any argument means the terminal;
+   `--cli` exists for that. A frozen app without a console gets stdout/stderr on devnull. `/api/quit`
+   replies before setting quit (it raced the shutdown: the page got a broken connection now and then).
+   **CI** (`.github/workflows/build.yml`): ubuntu-22.04, windows-2022, macos-15 (arm64), macos-15-intel;
+   each builds and runs `testserver/ci_smoke.py` on the result: two downloaded mihomo cores (the "server"
+   renamed `relay-core` so discovery ignores it; the client with `local` = works and `dead` = closed port,
+   PROXY left on `dead`), controller per OS (Linux Unix socket, macOS TCP + secret from the YAML, Windows
+   named pipe), then a `--cli` run (exit 0, local ok, dead not, reports saved), restore check, and the
+   double-click path (`BROWSER` = a no-op program; page and token served, API finds the core, Quit ends it).
+   12 checks; on Linux also run by hand on `sgp-vps` with its mihomo service stopped (`systemctl stop
+   mihomo`, start it again after). **Releases**: push a tag `vX.Y.Z` equal to `__version__`; the release job
+   (the only one with `contents: write`) checks that, writes `SHA256SUMS.txt` and runs `gh release create`.
+   Actions are pinned to commit SHAs (update them deliberately). The repo must be public for public releases.
+
 Estimate ≈ `servers × (6 + 1.4 × size)` s.
 Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probes), `https://speed.cloudflare.com/__down` / `__up`.
 
@@ -320,13 +345,12 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
-- **Paused 2026-10-17 by the user**, who is testing on various platforms. Roadmap steps 1–8 done, step 9
-  (GUI) first version done; next: the user's findings, then step 10 (packaging). Nothing in progress. When
-  work resumes, ask for those findings first. Not yet covered by tests: the GUI on macOS or a Linux
-  desktop, the GUI with FlClash (its secret field) and with a TCP controller, a non-English Windows, macOS
-  at all. The VM is in its normal state (Clash Verge Rev at login, TUN off, current code in
-  `C:\Users\addohm\mst`); the user ran the GUI there after the pipe-list fix (a report from 2026-10-16 23:11
-  VM time is in its Documents).
+- **Resumed 2026-10-19** (the user, after testing on various platforms: "it tested well"): step 10 built
+  (see "How it works" 10); first release pending (see ROADMAP: repo public, CI green on all four systems).
+  Not yet covered by tests: the GUI on a Linux desktop, the GUI with FlClash (its secret field) and with a
+  TCP controller, a non-English Windows; macOS only through the CI smoke test (stand-in mihomo, no real
+  client). The VM's tunnel hasn't connected since 2026-10-17 01:38 UTC (VM off?), so the Windows build was
+  checked only by CI; before that the VM was in its normal state (Clash Verge Rev at login, TUN off).
 - **Windows** (roadmap step 5), first runs on the VM 2026-10-16 (Clash Verge Rev in service mode, mihomo
   v1.19.32, Python 3.15, no PyYAML, en-US, from mainland China): `Get-CimInstance` discovery finds the core
   in session 0 and its per-user pipe `\\.\pipe\verge-mihomo-production-<hash>` from `-ext-ctl-pipe` (the

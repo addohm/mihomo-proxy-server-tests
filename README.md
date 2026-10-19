@@ -22,6 +22,8 @@ python3 mihomo_speedtest.py --gui                # the same in your web browser
 
 On Windows, use `py` instead of `python3` (e.g. `py mihomo_speedtest.py`).
 
+No Python? Use the packaged program instead (next section).
+
 While it runs, TUN is turned off and mihomo is put in global mode; your settings are restored at the end
 (also on Ctrl+C, or when the window is closed on Windows). Results are printed and saved as
 `mihomo-speedtest-YYYYMMDD-HHMMSS.md` and `.csv` in a `mihomo-speedtest` folder in your Documents folder
@@ -29,6 +31,28 @@ While it runs, TUN is turned off and mihomo is put in global mode; your settings
 
 If more than one mihomo client is running, the first one found is tested; the line "Connected to mihomo …
 at …" says which. Use `--api` to choose another (e.g. its pipe, `--api \\.\pipe\NAME`).
+
+## Packaged program (no Python needed)
+
+Ready-made programs are on the [Releases page](../../releases): download the one for your system. They're
+the same program; started with a **double-click (no options) they open the page in your browser** (`--gui`);
+with any option, e.g. `--cli` or `--filter Japan`, they run in the terminal like the script.
+
+| System | File | First start |
+|---|---|---|
+| Windows 10/11 (x64) | `mihomo-speedtest-VERSION-windows-x64.exe` | Double-click. Windows may say "Windows protected your PC": click **More info**, then **Run anyway** (the program isn't signed; that costs money). A black window opens and says the test runs in your browser: close it to quit. |
+| macOS, Apple Silicon (M1 and later) | `mihomo-speedtest-VERSION-macos-arm64.zip` | Unzip, move `mihomo-speedtest.app` to Applications, double-click. macOS says it can't check the app: click **Done**, open **System Settings → Privacy & Security**, scroll down to the message about mihomo-speedtest and click **Open Anyway**, then confirm. Only needed once. |
+| macOS, Intel | `mihomo-speedtest-VERSION-macos-x64.zip` | The same as Apple Silicon. |
+| Linux (x86-64, glibc 2.35+, e.g. Ubuntu 22.04 or newer) | `mihomo-speedtest-VERSION-linux-x64` | `chmod +x mihomo-speedtest-*-linux-x64`, then run it: without options it opens the page in your browser, `--cli` runs in the terminal. |
+
+On macOS the app has no window or Dock icon of its own: the page in your browser is the app. Quit with the
+page's **Quit** button; it also quits by itself five minutes after the page was closed. In the terminal:
+`/Applications/mihomo-speedtest.app/Contents/MacOS/mihomo-speedtest --cli` (or any other option).
+
+Each release has a `SHA256SUMS.txt` with every file's checksum, to check a download: `sha256sum FILE`
+(Linux), `shasum -a 256 FILE` (macOS), `Get-FileHash FILE` (Windows PowerShell). The programs are built
+from this repository by GitHub Actions ([the workflow](.github/workflows/build.yml)), which also tests each
+one on its system before a release.
 
 ## Reading the results
 
@@ -146,6 +170,7 @@ Python 3.8+, `curl` and `ping`. PyYAML is optional. `--gui` needs only a web bro
 Run with `--help` for all options.
 
 Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script runs the code in that folder.
+The packaged program needs nothing else (PyYAML is included); it uses the system's `curl` and `ping` too.
 
 Status: in use on Linux. Windows: tested with Clash Verge Rev, Clash Party, FlClash, Clash Nyanpasu and a
 plain mihomo core (named pipe or TCP controller, TUN on or off, different proxy ports, with or without

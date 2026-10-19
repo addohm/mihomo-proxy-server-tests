@@ -1,0 +1,76 @@
+# Build the packaged program on each OS, smoke-test it against a stand-in mihomo, and publish a release for
+# a version tag (v1.2.3). Kept minimal on purpose (ROADMAP step 10): read-only by default, write access only
+# in the release job, no secrets but the built-in token, every action pinned to a commit. Review this file
+# before each release.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-22.04, binary: "dist/release/mihomo-speedtest-*-linux-x64"}  # older glibc: runs on more distros
+          - {os: windows-2022, binary: "dist/release/mihomo-speedtest-*-windows-x64.exe"}
+          - {os: macos-15, binary: "dist/mihomo-speedtest.app/Contents/MacOS/mihomo-speedtest"}  # Apple Silicon
+          - {os: macos-15-intel, binary: "dist/mihomo-speedtest.app/Contents/MacOS/mihomo-speedtest"}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Build
+        run: |
+          python -m pip install -r packaging/requirements.txt
+          python packaging/build.py
+      - name: Smoke test (stand-in mihomo; terminal run, restore, double-click GUI)
+        run: python testserver/ci_smoke.py ${{ matrix.binary }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-${{ matrix.os }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # create the release; nothing else
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag matches the program's version
+        run: |
+          v=$(python3 -c 'import re; print(re.search(r"__version__ = \"(.+)\"", open("mihomotest/__init__.py").read())[1])')
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "::error::tag $GITHUB_REF_NAME but __version__ is $v"; exit 1; }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          path: release
+          merge-multiple: true
+      - name: Checksums and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" * --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+            --notes "Download the file for your system, then see \"Packaged program\" in the README for the first start (Windows SmartScreen, macOS Gatekeeper). SHA256SUMS.txt lists each file's checksum."

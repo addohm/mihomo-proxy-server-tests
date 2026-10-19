@@ -1,0 +1,3 @@
+# Build tools for packaging/build.py, pinned (GitHub Actions installs exactly these)
+pyinstaller==6.22.3
+PyYAML==6.0.3

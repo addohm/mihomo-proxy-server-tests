@@ -19,7 +19,9 @@ What it does
      window is closed), prints the results and saves a Markdown and a CSV report (and, with
      --compare, what changed since a saved run).
 
-Works on Linux, macOS and Windows. Uses the system's curl and ping.
+Works on Linux, macOS and Windows. Uses the system's curl and ping. The packaged program (from the
+Releases page) opens the page in your browser when started without options (a double-click); with any
+option it runs in the terminal.
 While the test runs, traffic that goes through mihomo uses the server under test.
 
 Optional arguments
@@ -39,6 +41,8 @@ Optional arguments
   --gui            open the test as a page in your web browser (on this computer only)
   --no-browser     with --gui: only print the page's address (e.g. on a server, through
                    an SSH tunnel: ssh -L PORT:127.0.0.1:PORT server)
+  --cli            run in the terminal (for the packaged program, which otherwise opens the page)
+  --version        print the version
   --trace          for servers that didn't work, show where the path stops and who owns
                    each hop: a path trace for servers that don't answer ping, a TCP trace to
                    the port for those that do (Linux, run with sudo). Hop addresses are looked up
@@ -58,11 +62,16 @@ import threading
 import time
 import unicodedata
 
+from . import __version__
 from .mihomo import STOP_SIGNALS, MihomoError, SecretNeeded, find_controller, list_servers
 from .report import BASELINE, HEADERS, LEGEND, cells, finish, load_report, mmss, notes, reports_dir, summary
 from .system import IS_WIN, prereqs
 from .tests import RESULTS, counts, run_tests
 
+FROZEN = getattr(sys, "frozen", False)  # the packaged program (PyInstaller)
+if FROZEN:  # an app without a console window may have no stdout / stderr
+    sys.stdout = sys.stdout or open(os.devnull, "w")
+    sys.stderr = sys.stderr or open(os.devnull, "w")
 if IS_WIN:
     os.system("")  # enable ANSI colours in Windows terminals
 for _stream in (sys.stdout, sys.stderr):  # e.g. ✔ or server names when output goes to a file on Windows
@@ -214,8 +223,28 @@ def positive(kind):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="mihomo_speedtest.py", description="Test every server in your running mihomo.",
+    # The packaged program started without arguments (a double-click) opens the GUI; any argument (e.g. --cli)
+    # means the terminal. macOS may pass a -psn_ process id when the app is opened from Finder.
+    argv = [a for a in sys.argv[1:] if not a.startswith("-psn_")]
+    double_click = FROZEN and not argv
+    try:
+        _main(["--gui"] if double_click else argv, double_click)
+    except SystemExit as e:
+        if double_click and IS_WIN and e.code not in (None, 0):  # keep the window open so the message can be read
+            if isinstance(e.code, str):
+                print(e.code)
+            input("\nPress Enter to close this window.")
+            raise SystemExit(1)
+        raise
+
+
+def _main(argv, double_click=False):
+    prog = os.path.basename(sys.argv[0]) if FROZEN else "mihomo_speedtest.py"
+    ap = argparse.ArgumentParser(prog=prog, description="Test every server in your running mihomo.",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
+    ap.add_argument("--version", action="version", version=f"mihomo-speedtest {__version__}")
+    ap.add_argument("--cli", action="store_true",
+                    help="run in the terminal (the packaged program opens the GUI when started without arguments)")
     ap.add_argument("--filter", help="only test servers whose name matches this regex")
     ap.add_argument("--size", type=positive(float), default=10, help="download MB per server (upload is half). Default 10; raise it when "
                     "the Note says a transfer was too quick to time")
@@ -233,7 +262,8 @@ def main():
     ap.add_argument("--trace", action="store_true",
                     help="trace the servers that didn't work and look up who owns each hop (sends hop addresses "
                          "to Team Cymru's lookup service)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    args.idle_quit = double_click  # no terminal to close: the GUI quits by itself when its page is gone
     base_path = os.path.join(args.out, BASELINE)
     base = None
     if args.compare is not None:

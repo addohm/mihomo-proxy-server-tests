@@ -1,3 +1,6 @@
 mihomo-speedtest-*.md
 mihomo-speedtest-*.csv
 __pycache__/
+build/
+dist/
+*.spec

@@ -12,6 +12,7 @@ Windows tester PCs reached through a reverse SSH tunnel (set up with
 | `tester-windows.cmd` | Windows tester PC | revtunnel preset for a tester PC (double-click) |
 | `win_matrix.py` | Windows tester PC | Config variants of the PC's mihomo client, loaded through its API: found, tested, restored |
 | `win_interrupt.py` | Windows tester PC | Stops a speed test with Ctrl+C or by closing its window, and checks mihomo was restored |
+| `ci_smoke.py` | any OS without its own mihomo running (GitHub Actions) | Tests a packaged program against two downloaded stand-in mihomo cores: terminal run, restore, double-click GUI |
 
 The scripts' headers have every option; this page is the workflow.
 

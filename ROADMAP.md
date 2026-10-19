@@ -16,14 +16,18 @@ nothing here is started until the user says so. Done items are removed (see git 
 6. ~~`--trace` (path trace, TCP trace with root, hop owners, CDN-by-owner)~~ — done 2026-10-17
 7. ~~Per-user reports folder + baseline / `--compare`~~ — done 2026-10-17
 8. ~~Clearer result labels~~ — done 2026-10-17
-9. GUI (local web page) — first version 2026-10-17 (`--gui`); packaged "double-click → GUI" comes with step 10
-10. Packaging + releases
+9. ~~GUI (local web page)~~ — done 2026-10-17 (`--gui`); the user tested it on several platforms (2026-10-19:
+   "it tested well"); double-click → GUI came with step 10
+10. Packaging + releases — built 2026-10-19 (`packaging/build.py`, `.github/workflows/build.yml`, CI smoke test
+   on Linux, Windows and both Macs); first release pending (see below)
 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
 
-**Status 2026-10-17: paused by the user**, who is testing on various platforms. Steps 1–8 are done, step 9
-has a first version (`--gui`). Next, when work resumes: the user's findings from that testing (fixes and
-GUI changes), then step 10 (packaging). Nothing is in progress or uncommitted.
+**Status 2026-10-19:** the user's platform testing went well; work resumed with step 10. Packaging and the CI
+workflow are done and checked on Linux by hand; the Windows and macOS builds are checked only by the CI run.
+Before the first release (`v0.1.0`): the repository has to be public (releases of a private repository
+aren't visible to users, and Actions minutes are free only for public ones; macOS minutes count ten times),
+and the first CI run on all four systems has to pass.
 
 ## 6. Traceroute on failure (`--trace`)
 
@@ -126,9 +130,11 @@ tried it: feedback; the packaged program opening it on a double-click is part of
 
 ## Testing other platforms
 
-- No Mac is available. macOS (and Windows) can be covered by GitHub Actions runners: a job that starts a
-  second local mihomo as a stand-in "server" (no subscription needed) and runs the script's real platform
-  paths (discovery, named pipe, ping parsing, curl, restore).
+- No Mac is available. macOS (and Windows) are covered by GitHub Actions runners: `testserver/ci_smoke.py`
+  starts a second local mihomo as a stand-in "server" (no subscription needed) and runs the packaged
+  program's real platform paths (discovery, controller over a Unix socket / TCP + secret / named pipe, curl,
+  ping, reports, restore, the double-click GUI) on every push (done 2026-10-19). Not covered there: TUN, real
+  clients, real servers' failures.
 - A Windows 11 VM (in mainland China, reached through the reverse tunnel) is the Windows tester; see
   "4–5" below and `testserver/README.md`.
 
