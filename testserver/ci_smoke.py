@@ -207,4 +207,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:  # noqa: BLE001 - a crash must show up as a failure with its cause, also as an annotation
+        import traceback
+        check(False, "the smoke test itself crashed", traceback.format_exc()[-1500:].replace("\n", " | "))
+        sys.exit(1)
