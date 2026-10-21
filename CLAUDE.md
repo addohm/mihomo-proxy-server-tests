@@ -315,6 +315,11 @@ IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in
 
 ### Windows tester VM: what's on it (2026-10-17, snapshot taken by the user after this)
 
+**Tunnel shut down 2026-10-21 (user):** the VM's revtunnel task "revtunnel main" is **disabled and
+stopped** (files kept in `C:\ProgramData\revtunnel\main`), so `ssh mihomo-winvm` doesn't connect. To bring
+it back, on the VM as administrator: `Enable-ScheduledTask 'revtunnel main'; Start-ScheduledTask 'revtunnel
+main'` (or re-run `testserver/tester-windows.cmd`); the relay side on `sgp-vps` is unchanged.
+
 `DESKTOP-BJUBIRD` (mainland China), reached as `ssh mihomo-winvm`. **Since 2026-10-21 in Chinese** (zh-CN
 display language, format and system locale; the user asked for it; English is still installed). The VM's host key isn't kept in the
 workspace's `/claude ssh` known_hosts (that file is rewritten): pass `-o UserKnownHostsFile=~/.ssh/
