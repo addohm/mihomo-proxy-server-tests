@@ -30,8 +30,9 @@ aren't visible to users, and Actions minutes are free only for public ones; macO
 and the first CI run on all four systems has to pass.
 
 **Decided 2026-10-21 (user):** the repository **stays private** until the user is happy with where it is, so
-no release yet, and no push while it's private unless the user asks (each push runs the four CI builds, and
-the two macOS ones use private-repo minutes at ten times the rate). **macOS isn't a priority** for the user:
+no release yet. The CI workflow runs only when started by hand or for a version tag, not on every push (the
+two macOS builds use private-repo minutes at ten times the rate), so the code can be pushed as a backup.
+Before a release: make the repo public, run the workflow by hand, then tag. **macOS isn't a priority** for the user:
 its code paths and CI builds stay (the tool remains universal), but no extra macOS work or testing. The
 Linux and Windows builds were tested by hand on the test machines on 2026-10-21 (see CLAUDE.md).
 
