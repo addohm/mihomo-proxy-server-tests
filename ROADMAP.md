@@ -167,9 +167,9 @@ tried it: feedback; the packaged program opening it on a double-click is part of
   window restore everything (`testserver/win_interrupt.py`). The Windows matrix
   (`testserver/win_matrix.py`) passes 6 of 6; TUN on at rest and the PyYAML path for failed servers pass
   too. A TCP controller can't be switched on through the API (only at start-up); it's covered by the
-  Linux matrix. **Step 5 done 2026-10-16** for Clash Verge Rev; other Windows clients (Mihomo Party,
-  Nyanpasu, FlClash) and a non-English Windows haven't run (ping parsing checked offline for zh / de /
-  ja).
+  Linux matrix. **Step 5 done 2026-10-16** for Clash Verge Rev; the other Windows clients (Clash Party,
+  Nyanpasu, FlClash, plain mihomo) followed on 2026-10-17, and a Chinese Windows (zh-CN display language and
+  system locale) on 2026-10-21: all pass.
 - **Tester setup made clear and generic: done 2026-10-16, as its own project, revtunnel**
   (`addohm/revtunnel`). After the first VM run, where the user couldn't tell what was going on or what to
   do, the user asked for guided steps that say what, why and **where** (PC / server), and for a tool that

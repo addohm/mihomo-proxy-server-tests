@@ -138,9 +138,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
      (mihomo streams warnings even at client log level `silent`). A server that isn't ok gets the most
      common `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in
      `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note. `CAUSES` has
-     both the Linux/macOS and the English Windows (`connectex` / `wsarecv`) wordings; on a non-English
-     Windows these messages are localised and fall through to "mihomo could not connect through this
-     server" (the direct check still tells what happened).
+     both the Linux/macOS and the Windows (`connectex` / `wsarecv`) wordings. mihomo's Windows errors are
+     **English on every Windows language** (Go asks Windows for English error texts): checked 2026-10-21 on
+     a Chinese Windows, with mihomo both as a service (Verge) and in the user's session (plain mihomo).
 6. After **all** transfers (so the test's own traffic doesn't inflate ping or jitter), ping every server
    together (`PING_COUNT` 10, `PING_WORKERS` 50) at the address mihomo **actually dialed** (`remote_ip`:
    `/connections` → `metadata.remoteDestination`, polled during the download; some protocols, e.g.
@@ -314,7 +314,8 @@ IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in
 
 ### Windows tester VM: what's on it (2026-10-17, snapshot taken by the user after this)
 
-`DESKTOP-BJUBIRD` (mainland China), reached as `ssh mihomo-winvm`. The VM's host key isn't kept in the
+`DESKTOP-BJUBIRD` (mainland China), reached as `ssh mihomo-winvm`. **Since 2026-10-21 in Chinese** (zh-CN
+display language, format and system locale; the user asked for it; English is still installed). The VM's host key isn't kept in the
 workspace's `/claude ssh` known_hosts (that file is rewritten): pass `-o UserKnownHostsFile=~/.ssh/
 known_hosts_revtunnel_vm -o StrictHostKeyChecking=yes` (key recorded there). GitHub and winget's sources
 aren't reachable from the VM without a proxy: download installers on `sgp-vps`, check them against the
@@ -363,8 +364,14 @@ user says so.
   FlClash (the page asked for the secret, connected after it was entered, then showed "is your client
   started?" because FlClash comes back paused after a restart); full run of all 45 servers from China with
   the .exe: 16m55s, exit 0, restored, 27 ok / 14 blocked / 1 rejected / 1 no answer / 1 no route / 1 bad
-  config. Still not covered: the GUI on a Linux desktop, a non-English Windows (needs the user's OK to switch
-  the VM's language), macOS beyond the CI smoke test (no Mac). Double-click test harness: run a `.cmd` that
+  config. **Chinese Windows** (2026-10-21, the user's OK): VM
+  switched to zh-CN (language pack via `Install-Language zh-CN`, ~45 min; display language, format, home
+  location China, system locale zh-CN → code page 936; reboot): `ping` / `tracert` print Chinese and are read
+  correctly (Python decodes cp936), the .exe as a normal user with Clash Verge Rev and with plain mihomo:
+  every label right, traces with owners, restored; mihomo's errors stay English (see "Failure cause").
+  Capturing the frozen .exe's output from a pipe: it writes the system encoding (cp936) and ignores
+  `PYTHONIOENCODING`, so `…`/`±` look garbled if read as UTF-8; a real console shows them fine. Still not
+  covered: the GUI on a Linux desktop; macOS beyond the CI smoke test (not a priority). Double-click test harness: run a `.cmd` that
   sets `BROWSER=<python> <script that saves the URL> %s` with **forward slashes** (Python's webbrowser splits
   BROWSER like a Unix shell and eats backslashes), start it with the Limited-token scheduled task, drive
   `/api/*` with the saved URL.
@@ -408,9 +415,9 @@ user says so.
   activated. Finding: a TCP controller also keeps the secret it started with through a config load
   (win_matrix now skips "secret" for TCP controllers and falls back to the old secret after a load).
   **Plain mihomo** (v1.19.32 in `C:\mihomo`, TCP controller with a secret from its `-d` config): short run,
-  Ctrl+C, close and win_matrix all pass. Clash Party re-tested on the new VM: all pass, matrix 6/6. Not
-  covered: a non-English Windows (ping parsing only checked offline). **macOS** paths have never run and no Mac is available (GitHub Actions runners are the plan;
-  see ROADMAP).
+  Ctrl+C, close and win_matrix all pass. Clash Party re-tested on the new VM: all pass, matrix 6/6. A
+  Chinese Windows was tested on 2026-10-21 (see above). **macOS**: only the CI smoke test (no Mac; not a
+  priority for the user).
 - Step 3 thresholds (`BUSY_SHARE`, `BUSY_MIN`, `BUSY_RATE`, `PROBES`, `PING_COUNT`, `MIN_TRANSFER`) are
   first choices; tune them after real runs on desktop clients.
 - Runs so far: the test server (full runs of all 45 servers on 2026-10-16 before and after step 3, 42 ok
