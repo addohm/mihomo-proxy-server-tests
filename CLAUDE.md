@@ -305,8 +305,10 @@ IP excluded from TUN routing; `TUNNEL_KEY=…` also lets a tester PC's tunnel in
   - Anything that may cut the tunnel (TUN on/off, long runs): start it detached with `Invoke-CimMethod
     Win32_Process -MethodName Create` (processes started normally die with the SSH session) and have it
     write a log with `Out-File -Encoding utf8`: Windows PowerShell's `>>` / `*>>` write UTF-16, which a
-    plain `grep` on the fetched text never matches. Check the waiting condition on a finished log before
-    relying on it, and report as soon as the run ends.
+    plain `grep` on the fetched text never matches. **Fetch logs with `scp`**, not `Get-Content` over SSH:
+    a whole log with the results table (box-drawing characters) silently comes back empty that way, so a
+    waiter never sees its end marker (missed a finished full run for 40 min on 2026-10-21). Check the
+    waiting condition on a finished log before relying on it, and report as soon as the run ends.
 - Use it to check that the script works (discovery, state restore, labels, reports), not to judge servers:
   per-server results depend on the network the test runs from.
 
@@ -347,10 +349,22 @@ user says so.
 
 - **Resumed 2026-10-19** (the user, after testing on various platforms: "it tested well"): step 10 built
   (see "How it works" 10); first release pending (see ROADMAP: repo public, CI green on all four systems).
-  Not yet covered by tests: the GUI on a Linux desktop, the GUI with FlClash (its secret field) and with a
-  TCP controller, a non-English Windows; macOS only through the CI smoke test (stand-in mihomo, no real
-  client). The VM's tunnel hasn't connected since 2026-10-17 01:38 UTC (VM off?), so the Windows build was
-  checked only by CI; before that the VM was in its normal state (Clash Verge Rev at login, TUN off).
+  **Tested 2026-10-21 without CI** (the step 10 commit isn't pushed: the user hasn't yet made the repo
+  public): Linux build on `sgp-vps` (PyInstaller in `/root/mstvenv`, build in `/root/mstbuild`): ci_smoke
+  12/12 (mihomo service stopped and started again), the binary against the real mihomo with `--trace`
+  (mtr, owners), Linux matrix 8/8. Windows build on the VM (venv `C:\Users\addohm\mstvenv`, build in
+  `C:\Users\addohm\mstbuild`, 8.8 MB): ci_smoke 12/12 with `MIHOMO_EXE=C:\mihomo\mihomo.exe` (Verge stopped,
+  then restarted); as a **normal user** in the desktop session: `--cli` and the double-click page with Clash
+  Verge Rev (found through the pipe list; run with trace, restore, screenshot, Quit ends it within 1 s); the
+  double-click page with plain mihomo and Clash Nyanpasu (TCP + secret from their config; runs ok) and
+  FlClash (the page asked for the secret, connected after it was entered, then showed "is your client
+  started?" because FlClash comes back paused after a restart); full run of all 45 servers from China with
+  the .exe: 16m55s, exit 0, restored, 27 ok / 14 blocked / 1 rejected / 1 no answer / 1 no route / 1 bad
+  config. Still not covered: the GUI on a Linux desktop, a non-English Windows (needs the user's OK to switch
+  the VM's language), macOS beyond the CI smoke test (no Mac). Double-click test harness: run a `.cmd` that
+  sets `BROWSER=<python> <script that saves the URL> %s` with **forward slashes** (Python's webbrowser splits
+  BROWSER like a Unix shell and eats backslashes), start it with the Limited-token scheduled task, drive
+  `/api/*` with the saved URL.
 - **Windows** (roadmap step 5), first runs on the VM 2026-10-16 (Clash Verge Rev in service mode, mihomo
   v1.19.32, Python 3.15, no PyYAML, en-US, from mainland China): `Get-CimInstance` discovery finds the core
   in session 0 and its per-user pipe `\\.\pipe\verge-mihomo-production-<hash>` from `-ext-ctl-pipe` (the

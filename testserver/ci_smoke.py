@@ -4,7 +4,8 @@ Windows and both kinds of Mac after each build; it also runs on any test machine
 
     python testserver/ci_smoke.py PATH/TO/mihomo-speedtest[.exe]
 
-It downloads mihomo (MIHOMO_VERSION), then starts two cores in a temporary folder:
+It downloads mihomo (MIHOMO_VERSION; or set MIHOMO_EXE to a mihomo binary already on the machine, e.g. in
+mainland China where GitHub isn't reachable), then starts two cores in a temporary folder:
   - "relay-core" (renamed so the test doesn't find it): a plain proxy on 127.0.0.1:17891, standing in for a
     server on the internet;
   - "mihomo" (the one under test): servers "local" (socks5 to the relay: works) and "dead" (socks5 to a closed
@@ -50,6 +51,11 @@ def check(ok, what, detail=""):
 
 
 def download_mihomo(folder):
+    local = os.environ.get("MIHOMO_EXE")  # a mihomo already on this machine (e.g. where GitHub isn't reachable)
+    if local:
+        exe = os.path.join(folder, "mihomo" + (".exe" if IS_WIN else ""))
+        shutil.copy2(local, exe)
+        return exe
     arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
     osname = "windows" if IS_WIN else "darwin" if IS_MAC else "linux"
     flavour = arch if arch == "arm64" else "amd64-compatible"
