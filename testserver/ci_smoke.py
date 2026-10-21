@@ -20,6 +20,7 @@ Then:
 Exit code 1 on any failure; each check prints PASS / FAIL (and a GitHub annotation on failure).
 """
 import csv
+import glob
 import gzip
 import json
 import os
@@ -178,7 +179,12 @@ def run_gui(binary, tmp):
 
 
 def main():
-    binary = os.path.abspath(sys.argv[1])
+    # the workflow passes a pattern (dist/release/mihomo-speedtest-*-...): bash expands it, PowerShell (the
+    # Windows runner's shell) doesn't, so expand it here
+    found = sorted(glob.glob(sys.argv[1]))
+    binary = os.path.abspath(found[0] if found else sys.argv[1])
+    if not check(os.path.isfile(binary), "the program to test exists", binary):
+        sys.exit(1)
     tmp = tempfile.mkdtemp(prefix="mst-ci-")
     procs = []
     try:
