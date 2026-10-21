@@ -357,6 +357,10 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
+- **v0.1.0 released 2026-10-21** (user's go-ahead; repo public; CI green on all four systems; the four
+  downloads match `SHA256SUMS.txt`). All ten roadmap steps done. Next release: bump `__version__` in
+  `mihomotest/__init__.py`, run the matrix (Linux) and a Windows check, push, then tag `vX.Y.Z` (must equal
+  `__version__`). Nothing in progress; ask the user what's next.
 - **2026-10-21, user's decisions:** the repo stayed private at first; **it's public since later on
   2026-10-21** (user), so CI runs on every push again. No release (tag) without the user's go-ahead. **macOS isn't a
   priority**: keep its code and CI build, but no extra macOS work or testing.

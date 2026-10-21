@@ -18,8 +18,9 @@ nothing here is started until the user says so. Done items are removed (see git 
 8. ~~Clearer result labels~~ — done 2026-10-17
 9. ~~GUI (local web page)~~ — done 2026-10-17 (`--gui`); the user tested it on several platforms (2026-10-19:
    "it tested well"); double-click → GUI came with step 10
-10. Packaging + releases — built 2026-10-19 (`packaging/build.py`, `.github/workflows/build.yml`, CI smoke test
-   on Linux, Windows and both Macs); first release pending (see below)
+10. ~~Packaging + releases~~ — done: built 2026-10-19, **v0.1.0 released 2026-10-21**
+   (https://github.com/addohm/mihomo-proxy-server-tests/releases/tag/v0.1.0; four builds + SHA256SUMS.txt,
+   checksums verified after download)
 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
 
@@ -34,8 +35,9 @@ no release yet. Later the same day the user made the repository **public**, so t
 push again (free for public repositories). The first CI runs: Linux and both
 Macs passed at once; Windows needed three fixes, all in the smoke test (the step's PowerShell doesn't expand
 `*` in the program's path; a crash now shows as an annotation with its traceback; printing the program's
-output on the runner's cp1252 console). **All four green on 2026-10-21** (run 39598843811). Next: tag
-`v0.1.0` when the user says so. **macOS isn't a priority** for the user:
+output on the runner's cp1252 console). **All four green on 2026-10-21** (run 39598843811). **v0.1.0 released
+2026-10-21** with the user's go-ahead (tag on 7b24537; run 39601914276: four builds, smoke tests and the
+release job passed). All ten roadmap steps are done; anything next comes from the user. **macOS isn't a priority** for the user:
 its code paths and CI builds stay (the tool remains universal), but no extra macOS work or testing. The
 Linux and Windows builds were tested by hand on the test machines on 2026-10-21 (see CLAUDE.md).
 
