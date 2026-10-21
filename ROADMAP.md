@@ -29,6 +29,12 @@ Before the first release (`v0.1.0`): the repository has to be public (releases o
 aren't visible to users, and Actions minutes are free only for public ones; macOS minutes count ten times),
 and the first CI run on all four systems has to pass.
 
+**Decided 2026-10-21 (user):** the repository **stays private** until the user is happy with where it is, so
+no release yet, and no push while it's private unless the user asks (each push runs the four CI builds, and
+the two macOS ones use private-repo minutes at ten times the rate). **macOS isn't a priority** for the user:
+its code paths and CI builds stay (the tool remains universal), but no extra macOS work or testing. The
+Linux and Windows builds were tested by hand on the test machines on 2026-10-21 (see CLAUDE.md).
+
 ## 6. Traceroute on failure (`--trace`)
 
 Done 2026-10-17 as decided below (`mihomotest/trace.py`; details in CLAUDE.md, "How it works" 6b). Checked on

@@ -347,6 +347,9 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
+- **2026-10-21, user's decisions:** the repo **stays private** for now: no release, and **don't push** unless
+  the user asks (a push runs the 4 CI builds; macOS minutes count 10x on private repos). **macOS isn't a
+  priority**: keep its code and CI build, but no extra macOS work or testing.
 - **Resumed 2026-10-19** (the user, after testing on various platforms: "it tested well"): step 10 built
   (see "How it works" 10); first release pending (see ROADMAP: repo public, CI green on all four systems).
   **Tested 2026-10-21 without CI** (the step 10 commit isn't pushed: the user hasn't yet made the repo
