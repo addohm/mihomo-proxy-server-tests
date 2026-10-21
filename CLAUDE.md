@@ -227,7 +227,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    replies before setting quit (it raced the shutdown: the page got a broken connection now and then).
    **CI** (`.github/workflows/build.yml`; on every push to main, pull requests, `v*` tags and by hand; the
    repo is public since 2026-10-21, so Actions minutes are free. No `gh` here: watch runs through the public
-   API, `https://api.github.com/repos/addohm/mihomo-proxy-server-tests/actions/runs`): ubuntu-22.04, windows-2022, macos-15 (arm64), macos-15-intel;
+   API, `https://api.github.com/repos/addohm/mihomo-proxy-server-tests/actions/runs` and `…/runs/ID/jobs`;
+   job **logs need admin rights**, but annotations don't (`…/check-runs/JOB_ID/annotations`), which is why
+   `ci_smoke.py` reports even its own crash as a failure annotation. All four green since 2026-10-21): ubuntu-22.04, windows-2022, macos-15 (arm64), macos-15-intel;
    each builds and runs `testserver/ci_smoke.py` on the result: two downloaded mihomo cores (the "server"
    renamed `relay-core` so discovery ignores it; the client with `local` = works and `dead` = closed port,
    PROXY left on `dead`), controller per OS (Linux Unix socket, macOS TCP + secret from the YAML, Windows

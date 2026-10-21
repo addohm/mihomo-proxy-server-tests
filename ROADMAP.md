@@ -31,8 +31,11 @@ and the first CI run on all four systems has to pass.
 
 **Decided 2026-10-21 (user):** the repository **stays private** until the user is happy with where it is, so
 no release yet. Later the same day the user made the repository **public**, so the CI workflow runs on every
-push again (free for public repositories). Next: the first CI run on all four systems has to pass, then
-`v0.1.0` is tagged when the user says so. **macOS isn't a priority** for the user:
+push again (free for public repositories). The first CI runs: Linux and both
+Macs passed at once; Windows needed three fixes, all in the smoke test (the step's PowerShell doesn't expand
+`*` in the program's path; a crash now shows as an annotation with its traceback; printing the program's
+output on the runner's cp1252 console). **All four green on 2026-10-21** (run 39598843811). Next: tag
+`v0.1.0` when the user says so. **macOS isn't a priority** for the user:
 its code paths and CI builds stay (the tool remains universal), but no extra macOS work or testing. The
 Linux and Windows builds were tested by hand on the test machines on 2026-10-21 (see CLAUDE.md).
 
