@@ -179,6 +179,8 @@ def run_gui(binary, tmp):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):  # the Windows runner's console is cp1252: don't crash on the
+        stream.reconfigure(errors="replace")  # program's table characters when printing its output
     # the workflow passes a pattern (dist/release/mihomo-speedtest-*-...): bash expands it, PowerShell (the
     # Windows runner's shell) doesn't, so expand it here
     found = sorted(glob.glob(sys.argv[1]))
