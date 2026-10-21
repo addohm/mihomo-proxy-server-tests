@@ -4,11 +4,11 @@
 # before each release.
 name: build
 
-# Not on every push while the repository is private (user, 2026-10-21: the macOS runners bill ten times):
-# start it by hand (Actions -> build -> Run workflow), or push a version tag to build and release.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:

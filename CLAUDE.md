@@ -225,8 +225,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    error exit in that mode waits for Enter so the window can be read. Any argument means the terminal;
    `--cli` exists for that. A frozen app without a console gets stdout/stderr on devnull. `/api/quit`
    replies before setting quit (it raced the shutdown: the page got a broken connection now and then).
-   **CI** (`.github/workflows/build.yml`; runs only when started by hand — Actions → build → Run workflow —
-   or for a `v*` tag, not on every push, since 2026-10-21 while the repo is private): ubuntu-22.04, windows-2022, macos-15 (arm64), macos-15-intel;
+   **CI** (`.github/workflows/build.yml`; on every push to main, pull requests, `v*` tags and by hand; the
+   repo is public since 2026-10-21, so Actions minutes are free. No `gh` here: watch runs through the public
+   API, `https://api.github.com/repos/addohm/mihomo-proxy-server-tests/actions/runs`): ubuntu-22.04, windows-2022, macos-15 (arm64), macos-15-intel;
    each builds and runs `testserver/ci_smoke.py` on the result: two downloaded mihomo cores (the "server"
    renamed `relay-core` so discovery ignores it; the client with `local` = works and `dead` = closed port,
    PROXY left on `dead`), controller per OS (Linux Unix socket, macOS TCP + secret from the YAML, Windows
@@ -354,9 +355,8 @@ winget manifest's SHA-256 (`microsoft/winget-pkgs`), copy them in with scp.
 Planned features and decisions live in `ROADMAP.md` — keep it updated; don't start roadmap items until the
 user says so.
 
-- **2026-10-21, user's decisions:** the repo **stays private** for now: no release. Pushing is fine again: the
-  workflow no longer runs on pushes (only by hand or for a `v*` tag), so pushes cost no Actions minutes
-  (macOS minutes count 10x on private repos). Run it by hand before a release. **macOS isn't a
+- **2026-10-21, user's decisions:** the repo stayed private at first; **it's public since later on
+  2026-10-21** (user), so CI runs on every push again. No release (tag) without the user's go-ahead. **macOS isn't a
   priority**: keep its code and CI build, but no extra macOS work or testing.
 - **Resumed 2026-10-19** (the user, after testing on various platforms: "it tested well"): step 10 built
   (see "How it works" 10); first release pending (see ROADMAP: repo public, CI green on all four systems).
