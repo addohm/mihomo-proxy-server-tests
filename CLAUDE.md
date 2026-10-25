@@ -13,7 +13,9 @@ roadmap step done) also read all of them end to end and fix anything stale (user
   explicitly says to.** It turns TUN off and switches mode/selection on a live client.
 - Test it **yourself, on the test machines over SSH**: the Linux test server and the Windows tester PC
   (through the tunnel). Don't ask the user to run things there (user, 2026-10-16). See "Remote test
-  server" below.
+  server" below. **Since about 2026-10-25 there is no test server** (the user deleted `sgp-vps`) and the
+  VM's tunnel is off: until the user provides new ones, only static checks and GitHub Actions (CI) are
+  available; say so instead of testing elsewhere.
 - Static checks are fine: `python3 -m py_compile mihomo_speedtest.py mihomotest/*.py`, and importing the
   package (it has no side effects on import).
 - Keep changes small and inside the design below. The user has twice asked for simplicity after over-engineering.
@@ -245,6 +247,17 @@ Test endpoints: `http://www.gstatic.com/generate_204` (warm-up, connection probe
 
 ## Remote test server
 
+> **Deleted by the user after the v0.1.0 release (between 2026-10-21 and 2026-10-25).** `sgp-vps` now
+> answers with a different host key (its address may belong to someone else): **don't connect to it**, and
+> don't use `ssh mihomo-winvm` (its ProxyCommand jumped through `sgp-vps`; the `/claude ssh` entry for
+> `sgp-vps` can be removed by the user with `/claude ssh`). To test again: the user provides a new VPS (any
+> Fedora or Debian/Ubuntu); run `testserver/setup.sh` on it with the subscription (the user has the URL;
+> never commit it), remove the IPv6 servers' `[…]` brackets by hand as below if the provider still sends
+> them, and for the Windows VM make it the revtunnel relay (`revtunnel-relay.sh` with the VM's key) and
+> re-run `testserver/tester-windows.cmd` on the VM with the new address (its tunnel task is disabled
+> anyway). The rest of this section describes how the deleted server was set up and used; the procedures
+> (matrix, failure simulation, Windows testing) apply to a new one unchanged.
+
 An Ubuntu 24.04 VPS in Singapore (`sgp-vps`, set up 2026-10-17; the earlier Fedora server was deleted, and
 the `mihomo-testserver` alias with it) running a plain mihomo core as a systemd service (`mihomo.service`,
 config `/etc/mihomo/`, controller `127.0.0.1:9090` with the secret in the config, mixed-port 7890,
@@ -360,7 +373,8 @@ user says so.
 - **v0.1.0 released 2026-10-21** (user's go-ahead; repo public; CI green on all four systems; the four
   downloads match `SHA256SUMS.txt`). All ten roadmap steps done. Next release: bump `__version__` in
   `mihomotest/__init__.py`, run the matrix (Linux) and a Windows check, push, then tag `vX.Y.Z` (must equal
-  `__version__`). Nothing in progress; ask the user what's next.
+  `__version__`) — the matrix and the Windows check need a test server again (see "Remote test server").
+  Nothing in progress; ask the user what's next.
 - **2026-10-21, user's decisions:** the repo stayed private at first; **it's public since later on
   2026-10-21** (user), so CI runs on every push again. No release (tag) without the user's go-ahead. **macOS isn't a
   priority**: keep its code and CI build, but no extra macOS work or testing.

@@ -149,6 +149,9 @@ tried it: feedback; the packaged program opening it on a double-click is part of
   clients, real servers' failures.
 - A Windows 11 VM (in mainland China, reached through the reverse tunnel) is the Windows tester; see
   "4–5" below and `testserver/README.md`.
+- **Since about 2026-10-25 there's no test server** (the user deleted the VPS after the v0.1.0 release) and
+  the VM's tunnel is off, so only CI runs tests. Before the next release that changes discovery, selection
+  or restore, a new VPS is needed: `testserver/setup.sh`, then the VM's tunnel pointed at it (see CLAUDE.md).
 
 ## 4–5. Remote tester inside China, Windows paths (added 2026-10-16)
 
