@@ -90,7 +90,11 @@ def compare(results, base, names_now):
     server left out by --filter isn't reported as gone. Returns {stopped, recovered, swings, new, gone,
     notes}: lists of text lines."""
     out = {k: [] for k in ("stopped", "recovered", "swings", "new", "gone", "notes")}
-    num = lambda v: float(v) if v not in (None, "") else None
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):  # empty, or not a number (e.g. edited by hand): not compared
+            return None
     same_method = all(b.get("speed_method") == SPEED_METHOD for b in base.values())
     if not same_method:
         out["notes"].append("The saved report measured speeds another way (an older version), so speed changes "
@@ -138,16 +142,19 @@ def comparison_lines(cmp, base_date, base_path, now_date):
 def finish(results, meta, out_dir, base=None, names_now=(), save_baseline=False):
     """After a run: compare with a saved report (base: (path, date, rows) from load_report), save the
     Markdown + CSV reports and, if asked, the baseline. Returns {md, csv, comparison (lines or None),
-    baseline (path or None), tip (bool: no baseline exists yet)}."""
+    baseline (path or None), baseline_error (text or ""), tip (bool: no baseline exists yet)}."""
     comparison = None
     if base:
         comparison = comparison_lines(compare(results, base[2], set(names_now)), base[1], base[0], meta["date"])
     md, cs = save_reports(results, meta, out_dir, comparison)
-    baseline = None
+    baseline, baseline_error = None, ""
     if save_baseline:
         baseline = os.path.join(os.path.dirname(cs), BASELINE)
-        shutil.copyfile(cs, baseline)
-    return {"md": md, "csv": cs, "comparison": comparison, "baseline": baseline,
+        try:
+            shutil.copyfile(cs, baseline)
+        except OSError as e:  # e.g. baseline.csv is open in Excel, which locks it on Windows
+            baseline, baseline_error = None, f"Not saved as the baseline (is {BASELINE} open in another program?): {e}"
+    return {"md": md, "csv": cs, "comparison": comparison, "baseline": baseline, "baseline_error": baseline_error,
             "tip": not save_baseline and not os.path.isfile(os.path.join(out_dir, BASELINE))}
 
 
@@ -157,12 +164,6 @@ def save_reports(results, meta, out_dir, comparison=None):
         os.makedirs(out_dir, exist_ok=True)
     except OSError:
         pass
-    for d in (out_dir, os.getcwd(), tempfile.gettempdir()):
-        if d and os.path.isdir(d) and os.access(d, os.W_OK):
-            out_dir = d
-            break
-    md_path = os.path.join(out_dir, f"mihomo-speedtest-{stamp}.md")
-    csv_path = os.path.join(out_dir, f"mihomo-speedtest-{stamp}.csv")
     lines = ["# mihomo server test", "",
              f"- Date: {meta['date']}", f"- mihomo: {meta['version']} ({meta['api']})",
              f"- Download size: {meta['size']:g} MB, upload {meta['size'] / 2:g} MB",
@@ -187,17 +188,25 @@ def save_reports(results, meta, out_dir, comparison=None):
     if errors:
         lines += ["", "## Failure details", "", "mihomo's own error message for each server that didn't work:", ""]
         lines += [f"- **{r['name']}**: `{r['error'][:300]}`" for r in errors]
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-    with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel opens UTF-8 names
-        w = csv.writer(f)
-        w.writerow(["server", "type", "conn_ms", "conn_jitter_ms", "ping_ms", "ping_jitter_ms", "loss_pct",
-                    "download_mbps", "upload_mbps", "result", "note", "first_response_s", "direct_check",
-                    "other_traffic_mb", "mihomo_error", "speed_method", "trace", "date"])
-        num = lambda v, nd: "" if v is None else round(v, nd)
-        for r in results:
-            w.writerow([r["name"], r["type"], num(r["conn"], 1), num(r["conn_jitter"], 1), num(r["ping"], 1),
-                        num(r["ping_jitter"], 1), "" if r["loss"] is None else r["loss"],
-                        num(r["down"], 2), num(r["up"], 2), r["result"], r["note"], num(r["first"], 1),
-                        r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"], SPEED_METHOD, r.get("trace", ""), meta["date"]])
-    return md_path, csv_path
+    rows = [["server", "type", "conn_ms", "conn_jitter_ms", "ping_ms", "ping_jitter_ms", "loss_pct",
+             "download_mbps", "upload_mbps", "result", "note", "first_response_s", "direct_check",
+             "other_traffic_mb", "mihomo_error", "speed_method", "trace", "date"]]
+    num = lambda v, nd: "" if v is None else round(v, nd)
+    for r in results:
+        rows.append([r["name"], r["type"], num(r["conn"], 1), num(r["conn_jitter"], 1), num(r["ping"], 1),
+                     num(r["ping_jitter"], 1), "" if r["loss"] is None else r["loss"],
+                     num(r["down"], 2), num(r["up"], 2), r["result"], r["note"], num(r["first"], 1),
+                     r["check"], num(r["other"] and r["other"] / 1e6, 1), r["error"], SPEED_METHOD, r.get("trace", ""), meta["date"]])
+    # the first folder that takes the files (by trying: os.access can't tell on Windows)
+    for d in (out_dir, os.getcwd(), tempfile.gettempdir()):
+        md_path = os.path.join(d, f"mihomo-speedtest-{stamp}.md")
+        csv_path = os.path.join(d, f"mihomo-speedtest-{stamp}.csv")
+        try:
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+            with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel opens UTF-8 names
+                csv.writer(f).writerows(rows)
+            return md_path, csv_path
+        except OSError as e:
+            error = e
+    raise error

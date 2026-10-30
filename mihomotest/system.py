@@ -14,11 +14,11 @@ def ps_exe():
     return shutil.which("pwsh") or shutil.which("powershell")
 
 
-def run(args, timeout=60):
+def run(args, timeout=60, env=None):
     """Run a command directly (no shell). Returns (exit_code, stdout, stderr)."""
     try:
         p = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=timeout,
-                           errors="replace")
+                           errors="replace", env=env)
         return p.returncode, p.stdout.strip(), p.stderr.strip()
     except subprocess.TimeoutExpired:
         return 124, "", "timeout"

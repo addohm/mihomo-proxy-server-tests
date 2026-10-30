@@ -47,8 +47,9 @@ def parse_hops(out):
     number, then the first IP address on it (none = no answer). Works in any language."""
     hops = {}
     for line in out.splitlines():
-        m = re.match(r"\s*(\d+)[\s.:?|]", line)
-        if not m:
+        # not "8.8.8.8 へのルート…" / "2001:db8::1 …": some languages' tracert header starts with the target
+        m = re.match(r"\s*(\d+)(?:[\s:?|]|\.(?!\d))", line)
+        if not m or int(m.group(1)) > MAX_HOPS:
             continue
         n = int(m.group(1))
         ip = None

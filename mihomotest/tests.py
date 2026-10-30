@@ -123,12 +123,14 @@ def ping(ip, count=PING_COUNT):
         args = ["ping6", "-c", str(count), ip] if ":" in ip else ["ping", "-c", str(count), "-W", "2000", ip]
     else:
         args = ["ping", "-c", str(count), "-W", "2", ip]
-    _, out, _ = run(args, timeout=count * 3 + 5)
+    # Linux's ping translates "ms" (e.g. "时间=12 毫秒"): run it in English. Windows' says "ms" in most
+    # languages ("мс" in Russian / Ukrainian)
+    _, out, _ = run(args, timeout=count * 3 + 5, env=None if IS_WIN else dict(os.environ, LC_ALL="C"))
     # A reply line has exactly one "=12.3 ms" / "<1ms" value in any language; the Windows summary line
     # ("Minimum = 12ms, Maximum = ..., Average = ...") has three, and the Linux/macOS one uses "a/b/c ms".
     times = []
     for line in out.splitlines():
-        found = re.findall(r"[=<]\s*([\d.]+)\s*ms", line)
+        found = re.findall(r"[=<]\s*([\d.]+)\s*(?:ms|мс)", line)
         if len(found) == 1:
             times.append(float(found[0]))
     times = times[:count]
@@ -319,7 +321,17 @@ def other_traffic(ctl, seconds=2):
     return None if before is None or after is None else max(after - before, 0) / seconds
 
 
-def run_traces(ctl, results, targets, conf, pool, emit):
+def wait(futures, should_stop):
+    """Wait for the futures, but raise KeyboardInterrupt as soon as should_stop() is true: the GUI's Stop has
+    restored mihomo (TUN may be back on), so what's measured from then on isn't valid."""
+    pending = set(futures)
+    while pending:
+        _, pending = cf.wait(pending, timeout=0.5)
+        if should_stop and should_stop():
+            raise KeyboardInterrupt
+
+
+def run_traces(ctl, results, targets, conf, pool, emit, should_stop=None):
     """--trace: a path trace for servers that didn't work and don't answer ping, a TCP trace to the proxy port
     for those that do (ping already gets through there), then the network owner of every hop and server address. Summary in the Note
     and r["trace"], whole trace in r["trace_hops"]; servers on a known CDN (by owner) get a CDN note."""
@@ -338,9 +350,11 @@ def run_traces(ctl, results, targets, conf, pool, emit):
             elif port:
                 jobs[r["name"]] = pool.submit(tracing.trace, ip, port)
     emit("tracing", {"count": len(jobs)})
+    wait(jobs.values(), should_stop)
     traces = {name: fut.result() for name, fut in jobs.items()}
     hops = {h for t in traces.values() for _, h in t.get("hops", []) if h}
-    own = tracing.owners(ctl, hops | set(targets.values()), pool)
+    # mihomo may have reported a host name that its DNS couldn't resolve: only addresses can be looked up
+    own = tracing.owners(ctl, hops | {ip for ip in targets.values() if is_ip(ip)}, pool)
     for r in results:
         t = traces.get(r["name"])
         if t:
@@ -355,8 +369,10 @@ def run_traces(ctl, results, targets, conf, pool, emit):
 
 def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False, should_stop=None):
     """Test `servers` one at a time through mihomo; mihomo's state is always restored.
-    Returns (results, stopped); stopped = interrupted (Ctrl+C / SIGTERM, or should_stop() true before a
-    server, e.g. the GUI's Stop button), results then hold what was tested.
+    Returns (results, stopped); stopped = interrupted (Ctrl+C / SIGTERM, or should_stop(), checked between
+    servers and while pinging / tracing, e.g. the GUI's Stop button), results then hold what was tested. A
+    server whose test was under way when should_stop() turned true is left out, and pings / traces still
+    running then aren't used (the GUI restores mihomo at once).
 
     on_event(kind, data) is called with:
       "start"    {"total", "estimate", "state"}           before the first server (state: MihomoState)
@@ -395,8 +411,11 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False, sho
                 raise KeyboardInterrupt
             left = (time.time() - t0) / (i - 1) * (len(servers) - i + 1) if i > 1 else est
             emit("server", {"index": i, "total": len(servers), "server": srv, "left": left})
-            results.append(test_server(ctl, state, proxy, srv, size, timeout, up_file, logs))
-            emit("result", {"index": i, "result": results[-1]})
+            r = test_server(ctl, state, proxy, srv, size, timeout, up_file, logs)
+            if should_stop and should_stop():  # stopped during this test: mihomo was restored under it, so the
+                raise KeyboardInterrupt        # result isn't this server's; leave it out
+            results.append(r)
+            emit("result", {"index": i, "result": r})
         # ping only now, after every transfer, so the test's own traffic doesn't inflate ping and jitter.
         # Servers mihomo never connected to: ping the address from the config, resolved by mihomo;
         # failed servers also get a direct TCP check of their port, outside mihomo
@@ -418,6 +437,7 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False, sho
                 targets[name] = mihomo_resolve(ctl, ip) or ip
         pings = {name: pinger.submit(ping, ip) for name, ip in targets.items()}
         emit("pinging", {"count": len(pings)})
+        wait(list(pings.values()) + [fut for _, fut in checks.values()], should_stop)
         for r in results:
             if r["name"] in pings:
                 r["ping"], r["loss"], r["ping_jitter"] = pings[r["name"]].result()
@@ -434,7 +454,7 @@ def run_tests(ctl, servers, size=10, timeout=25, on_event=None, trace=False, sho
                 add_note(r, "via Cloudflare CDN: ping shows the CDN edge, not the server"
                          + ("; Conn ms is the real latency" if r["conn"] is not None else ""))
         if trace:
-            run_traces(ctl, results, targets, conf, pinger, emit)
+            run_traces(ctl, results, targets, conf, pinger, emit, should_stop)
     except KeyboardInterrupt:
         stopped = True
         emit("stopped", {})

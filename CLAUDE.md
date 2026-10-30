@@ -44,7 +44,7 @@ python3 mihomo_speedtest.py                                # everything, no prom
 python3 mihomo_speedtest.py --filter "Japan|Hong Kong"     # subset by regex
 ```
 
-Options: `--filter REGEX`, `--size MB` (default 10; upload is half; the only way to change the transfer
+Options: `--filter REGEX` (not case-sensitive; an invalid one stops before anything changes), `--size MB` (default 10; upload is half; the only way to change the transfer
 size), `--timeout SEC` (25) — both must be > 0,
 `--api ADDR` (`127.0.0.1:9090`, `unix:/path.sock`, `\\.\pipe\name`), `--secret` (or `MIHOMO_SECRET`),
 `--out DIR` (default `report.reports_dir()`: `Documents/mihomo-speedtest`, on Windows the real Documents
@@ -103,7 +103,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    `/logs`.
 3. `MihomoState`: records mode, TUN, `GLOBAL` selection (and, as they're touched, every other selector
    group's selection); turns TUN off, sets mode `global`; opens a temporary `mixed-port` only if there's no
-   local proxy port. Right after `apply()`, `proxy_answers` (tests.py) sends one proxy handshake to that
+   local proxy port (`applied` is set before opening it, so `restore()` closes it however the run ends). The
+   proxy address follows mihomo's `genAddr`: `bind-address` only with `allow-lan`, else 127.0.0.1 (IPv6 in
+   brackets). Right after `apply()`, `proxy_answers` (tests.py) sends one proxy handshake to that
    port: a paused core (FlClash when not started) accepts and drops it at once, and every server would look
    unusable, so the run stops with a `MihomoError` ("isn't passing connections … is your client
    started?"); a timeout counts as answering. `restore()` runs first in `finally` (also Ctrl+C, SIGTERM/HUP/BREAK), before anything
@@ -137,7 +139,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
      first response after N s"; no warm-up response but the transfers worked → "slow start: no response in
      the first 10 s".
    - **Failure cause**: `LogWatcher` streams `/logs?level=warning` in the background for the whole run
-     (mihomo streams warnings even at client log level `silent`). A server that isn't ok gets the most
+     (mihomo streams warnings even at client log level `silent`; `stop()` closes a Windows pipe in another
+     thread, so the reader also takes ValueError "closed file" as the end: it showed as a traceback in the
+     GUI's console, 2026-10-30). A server that isn't ok gets the most
      common `[TCP|UDP] dial … error:` message from its test window (`dial_error`) → raw text in
      `r["error"]` (reports only) and a plain meaning from `CAUSES` (`classify`) in the Note. `CAUSES` has
      both the Linux/macOS and the Windows (`connectex` / `wsarecv`) wordings. mihomo's Windows errors are
@@ -149,7 +153,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    hysteria2, report a host name, which is resolved through mihomo's DNS). `ping` returns average, loss and
    `ping_jitter`. Servers that never connect fall back to the config's `server` host resolved
    through mihomo's DNS (`config_servers` + `mihomo_resolve` via `/dns/query`, A then AAAA; `[…]` around IPv6
-   literals is stripped). macOS: `ping -W` is in ms, IPv6 uses `ping6`.
+   literals is stripped). macOS: `ping -W` is in ms, IPv6 uses `ping6`. Linux's iputils translates "ms"
+   (zh_CN "时间=12 毫秒"), so ping runs with `LC_ALL=C` there; Windows' ping says "ms" in most languages,
+   "мс" in Russian / Ukrainian (both matched).
    - **Direct TCP check** (failed servers only): plain TCP connect to the dialed/resolved IP and the
      config's port, outside mihomo (TUN is off) → `open` / `refused` / `no answer` / `no route`; UDP
      protocols (`UDP_TYPES`) → "not possible (UDP)". Address and port come from `config_servers`: the
@@ -165,7 +171,9 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    those that do answer ping a TCP trace to the proxy port (Linux as root with `traceroute -T` or `mtr --tcp`; otherwise the Note says
    "run with sudo", on Windows "not available"; UDP protocols: not possible); failed servers whose direct
    check says "no route" aren't traced. `parse_hops` reads every tool's output in any language (a line
-   starting with the hop number, then the first IP). Owners: Team Cymru TXT records (`origin.asn` /
+   starting with the hop number, ≤ `MAX_HOPS`, then the first IP; not a header that starts with the target,
+   as Japanese tracert's does). Owners are looked up only for addresses (a host name mihomo couldn't
+   resolve is skipped). Owners: Team Cymru TXT records (`origin.asn` /
    `AS<n>.asn`) through mihomo's `/dns/query` (works from China), else `whois.cymru.com:43` bulk; private
    / CGNAT hops are labelled, not looked up. Note: one-line `summary` ("stops after hop 11: IP (AS3257
    GTT-BACKBONE)", "reaches the server (13 hops)", "no answer from the server within 20 hops; last hop: …");
@@ -187,9 +195,11 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    show jitter as "182 ±12" (Conn ms, Ping ms); the CSV has separate `conn_ms`, `conn_jitter_ms`,
    `ping_ms`, `ping_jitter_ms` columns plus `first_response_s`, `direct_check`, `other_traffic_mb`,
    `mihomo_error`, `speed_method`, `trace`, `date`. The folder is created if missing; falls back to cwd,
-   then the temp dir, if it isn't writable. Reports are git-ignored.
+   then the temp dir, if writing fails (by trying: `os.access` says yes to any folder on Windows). Reports
+   are git-ignored. A baseline that can't be written (e.g. `baseline.csv` open in Excel) gives
+   `baseline_error` (printed, shown on the page); the run's end still works.
    - **Baseline / compare** (roadmap step 7; explicit only, never automatic): `--save-baseline` copies the
-     run's CSV to `baseline.csv` next to it; `--compare` loads `baseline.csv` from `--out` (or the given
+     run's CSV to `baseline.csv` next to it (numbers in it that don't parse are just not compared); `--compare` loads `baseline.csv` from `--out` (or the given
      CSV) **before** testing (missing → stop with a hint) and after the run `compare()` matches servers by
      name: stopped working / working again (`ok`/`partial` ↔ the others), swings over `SWING` (30 %) and
      `SWING_MIN` (2 Mbps, 20 ms) in download/upload/conn/ping, "not in the saved report", and "gone from
@@ -206,10 +216,14 @@ baseline). Interfaces (the CLI and the GUI) handle output. Keep it that way.
    results, summary, meanings, comparison, report paths), `/api/reports`, `/api/report?name=`; `POST
    /api/connect` (address / secret: the secret prompt as a page field), `/api/run` (servers, size, timeout,
    trace, save_baseline, compare), `/api/stop`, `/api/quit`. The run goes in a worker thread (`App._run`),
-   one at a time. **Stop** sets `should_stop` and calls `state.restore()` at once (it's idempotent; the
-   current server's test finishes through the restored selection, then the loop stops). Quit, Ctrl+C or
-   closing the console window do the same, then wait for the worker. `restore()` from a non-main thread
-   skips its signal guard (ValueError is caught). The page polls `/api/state` (1 s running, 4 s idle);
+   one at a time; `App.start` lists the servers again first (the profile may have changed). **Stop** sets
+   `should_stop` and calls `state.restore()` at once (it's idempotent). The current server's test runs on
+   through the restored settings, so the loop drops its result and stops; during pinging / tracing,
+   `tests.wait` stops waiting within 0.5 s and their results aren't used (TUN may be back on). `MihomoState`
+   holds a lock around apply / select / restore, and `select()` refuses once restored, so no group is
+   changed after the restore. Quit, Ctrl+C or closing the console window do the same, then wait for the
+   worker. `restore()` from a non-main thread skips its signal guard (ValueError is caught). Size and time
+   limit are checked in `App.start` (> 0), like the CLI's. The page polls `/api/state` (1 s running, 4 s idle);
    table sortable, a click on a row shows Note, direct check, mihomo's error, first response and trace;
    report history opens the Markdown. Checked 2026-10-17: Linux test server (token / Host / path checks,
    run, busy refusal, baseline, history, quit, restore) and the Windows VM from China with Clash Verge Rev
@@ -375,6 +389,13 @@ user says so.
   `mihomotest/__init__.py`, run the matrix (Linux) and a Windows check, push, then tag `vX.Y.Z` (must equal
   `__version__`) — the matrix and the Windows check need a test server again (see "Remote test server").
   Nothing in progress; ask the user what's next.
+- **2026-10-30, review after the user's first GUI `--trace` run** (v0.1.0 .exe, Windows: a `ValueError: I/O
+  operation on closed file` traceback from `LogWatcher` after the run, harmless): fixed that, plus GUI Stop
+  races (select after restore, Stop during pinging / tracing, dropped in-progress result), Linux ping in
+  other languages (`LC_ALL=C`), owners() on a host name, tracert headers that start with the target,
+  proxy address with `allow-lan` off, report folder fallback by trying, a locked `baseline.csv`, bad
+  `--filter`, 0-column terminals, GUI size/time checks and server re-list per run. Checked offline only
+  (fakes, no mihomo) so far: CI after the push, then the matrix and a Windows GUI run before a release.
 - **2026-10-21, user's decisions:** the repo stayed private at first; **it's public since later on
   2026-10-21** (user), so CI runs on every push again. No release (tag) without the user's go-ahead. **macOS isn't a
   priority**: keep its code and CI build, but no extra macOS work or testing.

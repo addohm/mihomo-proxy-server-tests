@@ -230,6 +230,7 @@ function render() {
   const rp = run.reports;
   $("reportsOut").innerHTML = rp ? `<p>Reports saved: <code>${esc(rp.md)}</code><br><code>${esc(rp.csv)}</code>` +
     (rp.baseline ? `<br>Saved as the baseline: <code>${esc(rp.baseline)}</code>` : "") +
+    (rp.baseline_error ? `<br><span class="error">${esc(rp.baseline_error)}</span>` : "") +
     (rp.tip ? `<br>Tip: when everything works well, run once with “Save as baseline” to compare later.` : "") + "</p>" : "";
 }
 

@@ -20,12 +20,12 @@ What it does
      --compare, what changed since a saved run).
 
 Works on Linux, macOS and Windows. Uses the system's curl and ping. The packaged program (from the
-Releases page) opens the page in your browser when started without options (a double-click); with any
-option it runs in the terminal.
+Releases page) opens the page in your browser when started without options (a double-click); with
+options (other than --gui) it runs in the terminal.
 While the test runs, traffic that goes through mihomo uses the server under test.
 
 Optional arguments
-  --filter REGEX   only test servers whose name matches
+  --filter REGEX   only test servers whose name matches (not case-sensitive)
   --size MB        download size per server (upload is half). Default 10. Raise it
                    (e.g. 50) when the Note says a transfer was too quick to time
   --timeout SEC    max seconds per transfer. Default 25
@@ -108,7 +108,7 @@ def width(s):
 def fit(s, n, right=False):
     s = str(s)
     if width(s) > n:
-        while width(s) > n - 1:
+        while s and width(s) > n - 1:
             s = s[:-1]
         s += "…"
     pad = " " * (n - width(s))
@@ -117,7 +117,7 @@ def fit(s, n, right=False):
 
 def status_line(text):
     if USE_COLOR:
-        text = fit(text, shutil.get_terminal_size((100, 20)).columns - 1).rstrip()
+        text = fit(text, (shutil.get_terminal_size((100, 20)).columns or 100) - 1).rstrip()
         print(f"\r\033[K{text}", end="", flush=True)
     else:
         print(text, flush=True)
@@ -245,7 +245,7 @@ def _main(argv, double_click=False):
     ap.add_argument("--version", action="version", version=f"mihomo-speedtest {__version__}")
     ap.add_argument("--cli", action="store_true",
                     help="run in the terminal (the packaged program opens the GUI when started without arguments)")
-    ap.add_argument("--filter", help="only test servers whose name matches this regex")
+    ap.add_argument("--filter", help="only test servers whose name matches this regex (not case-sensitive)")
     ap.add_argument("--size", type=positive(float), default=10, help="download MB per server (upload is half). Default 10; raise it when "
                     "the Note says a transfer was too quick to time")
     ap.add_argument("--timeout", type=positive(int), default=25, help="max seconds per transfer. Default 25")
@@ -264,6 +264,10 @@ def _main(argv, double_click=False):
                          "to Team Cymru's lookup service)")
     args = ap.parse_args(argv)
     args.idle_quit = double_click  # no terminal to close: the GUI quits by itself when its page is gone
+    try:
+        rx = re.compile(args.filter, re.I) if args.filter else None
+    except re.error as e:
+        sys.exit(bad(f"--filter: not a valid regular expression ({e})"))
     base_path = os.path.join(args.out, BASELINE)
     base = None
     if args.compare is not None:
@@ -300,8 +304,7 @@ def _main(argv, double_click=False):
     try:
         servers = list_servers(ctl)
         names_now = {s["name"] for s in servers}
-        if args.filter:
-            rx = re.compile(args.filter, re.I)
+        if rx:
             servers = [s for s in servers if rx.search(s["name"])]
         if not servers:
             sys.exit(bad("mihomo reports no servers to test."))
@@ -315,7 +318,7 @@ def _main(argv, double_click=False):
     n = counts(results)
     runtime = mmss(time.time() - t0)
     print(f"\n{bold(summary(n, len(results)))} in {runtime}")
-    wrap = min(shutil.get_terminal_size((100, 20)).columns - 1, 110)
+    wrap = min((shutil.get_terminal_size((100, 20)).columns or 100) - 1, 110)
     print(dim(textwrap.fill(LEGEND, wrap)))
     meanings = notes(n, RESULTS)
     if meanings:
@@ -336,6 +339,8 @@ def _main(argv, double_click=False):
     print(f"\nReports saved:\n  {done['md']}\n  {done['csv']}")
     if done["baseline"]:
         print(f"Saved as the baseline: {done['baseline']}")
+    elif done["baseline_error"]:
+        print(bad(done["baseline_error"]))
     elif done["tip"]:
         print(dim("Tip: run with --save-baseline when everything works well, so you can compare later "
                   "with --compare."))

@@ -160,12 +160,15 @@ class LogWatcher:
         while not self._stopped:
             try:
                 self._closer, f = self.ctl.stream("/logs?level=warning")
+                if self._stopped:  # stop() came while the stream was opening
+                    self._closer.close()
+                    return
                 for line in f:
                     try:
                         self.messages.append(str(json.loads(line).get("payload", "")))
                     except ValueError:
                         pass
-            except OSError:
+            except (OSError, ValueError):  # ValueError: stop() closed a Windows pipe under the read
                 pass
             if not self._stopped:
                 time.sleep(1)  # reconnect (e.g. mihomo restarted its API)
@@ -349,62 +352,72 @@ class MihomoState:
         self.saved = {}  # selector group -> its selection before the test (filled as groups are touched)
         self.opened_port = None
         self.applied = False
+        self.lock = threading.RLock()  # the GUI's Stop restores from another thread while a test runs
 
     def proxy_url(self):
-        host = str(self.conf.get("bind-address") or "*")
+        # mihomo's ports listen on bind-address only with allow-lan, else on 127.0.0.1
+        host = str(self.conf.get("bind-address") or "*") if self.conf.get("allow-lan") else "127.0.0.1"
         host = "127.0.0.1" if host in ("*", "0.0.0.0", "::", "") else host
+        host = f"[{host}]" if ":" in host else host
         for key, scheme in (("mixed-port", "socks5h"), ("socks-port", "socks5h"), ("port", "http")):
             if self.conf.get(key):
                 return f"{scheme}://{host}:{self.conf[key]}"
         with socket.socket() as s:  # no local port configured: open a temporary one
             s.bind(("127.0.0.1", 0))
             self.opened_port = s.getsockname()[1]
+        self.applied = True  # restore() closes it, even if the test stops before apply()
         self.ctl.call("PATCH", "/configs", {"mixed-port": self.opened_port})
         time.sleep(1)
-        return f"socks5h://127.0.0.1:{self.opened_port}"
+        return f"socks5h://{host}:{self.opened_port}"
 
     def apply(self):
-        self.applied = True
-        if self.tun:
-            self.ctl.call("PATCH", "/configs", {"tun": {"enable": False}})
-        self.ctl.call("PATCH", "/configs", {"mode": "global"})
+        with self.lock:
+            self.applied = True
+            if self.tun:
+                self.ctl.call("PATCH", "/configs", {"tun": {"enable": False}})
+            self.ctl.call("PATCH", "/configs", {"mode": "global"})
         time.sleep(2)  # let routes settle after TUN goes down
 
     def select(self, srv):
-        """Select a server by walking its path of selector groups (GLOBAL -> ... -> server)."""
-        for group, choice in srv.get("path") or []:
-            path = "/proxies/" + urllib.parse.quote(group, safe="")
-            if group not in self.saved:
-                st, g = self.ctl.call("GET", path)
-                self.saved[group] = (g or {}).get("now") if st == 200 else None
-            st, _ = self.ctl.call("PUT", path, {"name": choice})
-            if st not in (200, 204):
+        """Select a server by walking its path of selector groups (GLOBAL -> ... -> server). False if that
+        fails, or if the state was already restored (nothing may change after that)."""
+        with self.lock:
+            if not self.applied:
                 return False
-        return bool(srv.get("path"))
+            for group, choice in srv.get("path") or []:
+                path = "/proxies/" + urllib.parse.quote(group, safe="")
+                if group not in self.saved:
+                    st, g = self.ctl.call("GET", path)
+                    self.saved[group] = (g or {}).get("now") if st == 200 else None
+                st, _ = self.ctl.call("PUT", path, {"name": choice})
+                if st not in (200, 204):
+                    return False
+            return bool(srv.get("path"))
 
     def restore(self):
-        if not self.applied:
-            return
-        self.applied = False
-        held = {}  # a second Ctrl+C (or SIGTERM/HUP) must not cut the restore short
-        for sig in STOP_SIGNALS:
+        with self.lock:
+            if not self.applied:
+                return
+            self.applied = False
+            held = {}  # a second Ctrl+C (or SIGTERM/HUP) must not cut the restore short
+            for sig in STOP_SIGNALS:
+                try:
+                    held[sig] = signal.signal(getattr(signal, sig), signal.SIG_IGN)
+                except (AttributeError, OSError, ValueError):  # ValueError: not the main thread
+                    pass
             try:
-                held[sig] = signal.signal(getattr(signal, sig), signal.SIG_IGN)
-            except (AttributeError, OSError, ValueError):  # ValueError: not the main thread
-                pass
-        try:
-            saved = dict(self.saved, GLOBAL=self.global_now)  # inner groups first, GLOBAL last
-            for group in sorted(saved, key=lambda g: g == "GLOBAL"):
-                if saved[group]:
-                    self.ctl.call("PUT", "/proxies/" + urllib.parse.quote(group, safe=""), {"name": saved[group]})
-            self.ctl.call("PATCH", "/configs", {"mode": self.mode})
-            if self.opened_port:
-                self.ctl.call("PATCH", "/configs", {"mixed-port": 0})
-            if self.tun:
-                self.ctl.call("PATCH", "/configs", {"tun": {"enable": True}})
-        finally:
-            for sig, handler in held.items():
-                signal.signal(getattr(signal, sig), handler)
+                saved = dict(self.saved, GLOBAL=self.global_now)  # inner groups first, GLOBAL last
+                for group in sorted(saved, key=lambda g: g == "GLOBAL"):
+                    if saved[group]:
+                        self.ctl.call("PUT", "/proxies/" + urllib.parse.quote(group, safe=""), {"name": saved[group]})
+                self.ctl.call("PATCH", "/configs", {"mode": self.mode})
+                if self.opened_port:
+                    self.ctl.call("PATCH", "/configs", {"mixed-port": 0})
+                if self.tun:
+                    self.ctl.call("PATCH", "/configs", {"tun": {"enable": True}})
+            finally:
+                for sig, handler in held.items():
+                    signal.signal(getattr(signal, sig), handler)
 
     def describe(self):
         return (f"mode '{self.mode}', TUN {'on' if self.tun else 'off'}"

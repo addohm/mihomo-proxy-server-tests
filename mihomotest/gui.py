@@ -1,5 +1,6 @@
 """--gui: the same test as a local web page in the user's normal browser. A small stdlib web server on
 127.0.0.1 with a random token per launch (other websites can't drive it); the engine is the CLI's."""
+import csv
 import datetime
 import http.server
 import json
@@ -54,16 +55,29 @@ class App:
         with self.lock:
             if not self.ctl or (self.worker and self.worker.is_alive()):
                 return "not connected" if not self.ctl else "a test is already running"
+            try:  # the servers again: the profile may have changed since connecting (new names, new groups)
+                self.servers = list_servers(self.ctl)
+            except MihomoError as e:
+                return str(e)
             chosen = set(opts.get("servers") or [])
             servers = [s for s in self.servers if s["name"] in chosen]
             if not servers:
                 return "choose at least one server"
+            try:
+                opts["size"], opts["timeout"] = float(opts.get("size") or 10), int(float(opts.get("timeout") or 25))
+            except (TypeError, ValueError, OverflowError):
+                opts["size"] = opts["timeout"] = 0
+            if not (opts["size"] > 0 and opts["timeout"] > 0):
+                return "the download size and the time limit must be numbers greater than 0"
             base = None
             if opts.get("compare"):
                 path = os.path.join(self.out, BASELINE)
                 if not os.path.isfile(path):
                     return "there is no baseline yet: run once with 'Save as baseline'"
-                base = (path, *load_report(path))
+                try:
+                    base = (path, *load_report(path))
+                except (OSError, ValueError, csv.Error) as e:
+                    return f"can't read the baseline ({e})"
             self.stop.clear()
             self.run = {"running": True, "phase": "starting", "index": 0, "total": len(servers), "current": "",
                         "left": None, "results": [], "summary": "", "meanings": [], "comparison": None,
@@ -92,11 +106,11 @@ class App:
     def _run(self, servers, opts, base):
         t0 = time.time()
         try:
-            results, stopped = run_tests(self.ctl, servers, float(opts.get("size") or 10), int(opts.get("timeout") or 25),
+            results, stopped = run_tests(self.ctl, servers, opts["size"], opts["timeout"],
                                          self._event, trace=bool(opts.get("trace")), should_stop=self.stop.is_set)
             n = counts(results)
             meta = {"date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "version": self.version,
-                    "api": str(self.ctl), "size": float(opts.get("size") or 10), "runtime": mmss(time.time() - t0),
+                    "api": str(self.ctl), "size": opts["size"], "runtime": mmss(time.time() - t0),
                     "total": len(results), "counts": n, "meanings": RESULTS}
             done = finish(results, meta, self.out, base, [s["name"] for s in self.servers],
                           bool(opts.get("save_baseline"))) if results else None
@@ -104,7 +118,7 @@ class App:
                 self.run.update(results=[public(r) for r in results], summary=summary(n, len(results)),
                                 meanings=notes(n, RESULTS), runtime=meta["runtime"], stopped=stopped,
                                 comparison=done and done["comparison"],
-                                reports=done and {k: done[k] for k in ("md", "csv", "baseline", "tip")})
+                                reports=done and {k: done[k] for k in ("md", "csv", "baseline", "baseline_error", "tip")})
         except MihomoError as e:
             with self.lock:
                 self.run["error"] = str(e)

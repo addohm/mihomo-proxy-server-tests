@@ -112,8 +112,9 @@ lower.
 
 `--gui` opens the test as a page in your normal web browser: choose servers with checkboxes, set the options,
 press **Start**, and watch the results come in. Click a column to sort, and a row for its details (the cause,
-the port check, mihomo's own error, the trace). **Stop** ends the test after the current server and restores
-your settings right away. Earlier reports open from the page too.
+the port check, mihomo's own error, the trace). **Stop** restores your settings right away and ends the test
+(once the current server's test is over; that server is left out, since its test no longer went through it).
+Earlier reports open from the page too.
 
 The page is served by the script itself, on your computer only (127.0.0.1), and its address holds a random
 key, so other websites can't use it. On a server without a browser, add `--no-browser` and open the printed
@@ -147,7 +148,9 @@ stops to the Note, with the network that owns that hop (e.g. "path trace: stops 
 - servers that **do** (e.g. `blocked`, `refused`, `rejected`) would tell nothing from a path trace; they get a
   trace to their proxy port instead, which needs Linux and sudo (`sudo python3 mihomo_speedtest.py --trace`) with `traceroute` or
   `mtr` installed. "reaches the server" means the port is reachable and the problem is in the connection
-  itself (e.g. credentials, TLS); "stops after hop N" shows where it's blocked.
+  itself (e.g. credentials, TLS); "stops after hop N" shows where it's blocked. Under sudo the reports may
+  go to root's home folder: add `--out ~/Documents/mihomo-speedtest` to keep them (and the baseline) with
+  your others.
 - Servers whose address belongs to a CDN such as Fastly or Akamai are labelled like Cloudflare ones.
 - Takes about a minute more. **Privacy:** hop and server addresses are looked up in Team Cymru's public
   ASN service (through mihomo's DNS, or `whois.cymru.com`); without `--trace` nothing is sent.
