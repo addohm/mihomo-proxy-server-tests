@@ -385,8 +385,8 @@ Planned features and decisions live in `ROADMAP.md` — keep it updated; don't s
 user says so.
 
 - **v0.1.0 released 2026-10-21** (user's go-ahead; repo public; CI green on all four systems; the four
-  downloads match `SHA256SUMS.txt`). All ten roadmap steps done. **v0.1.1 released 2026-10-30** (the
-  fixes below; the user said "release it" knowing they were checked offline and by CI only: no test
+  downloads match `SHA256SUMS.txt`). All ten roadmap steps done. **v0.1.1 released 2026-10-30** (run
+  41063469431, four builds + release job green, downloads match `SHA256SUMS.txt`; the fixes below; the user said "release it" knowing they were checked offline and by CI only: no test
   server, so no matrix and no Windows run this time). Next release: bump `__version__` in
   `mihomotest/__init__.py`, run the matrix (Linux) and a Windows check, push, then tag `vX.Y.Z` (must equal
   `__version__`) — the matrix and the Windows check need a test server again (see "Remote test server").
