@@ -175,10 +175,11 @@ Run with `--help` for all options.
 Keep `mihomo_speedtest.py` and the `mihomotest/` folder together; the script runs the code in that folder.
 The packaged program needs nothing else (PyYAML is included); it uses the system's `curl` and `ping` too.
 
-Status: version 0.1.0 is the first release. In use on Linux. Windows: tested with Clash Verge Rev, Clash
-Party, FlClash, Clash Nyanpasu and a plain mihomo core (named pipe or TCP controller, TUN on or off,
-different proxy ports, with or without PyYAML), from mainland China, on English and Chinese Windows. macOS:
-the builds pass the automated test against a stand-in mihomo, but haven't been tried with a real client.
+Status: version 0.1.1 (bug fixes on top of the first release, 0.1.0). In use on Linux. Windows: 0.1.0 was
+tested with Clash Verge Rev, Clash Party, FlClash, Clash Nyanpasu and a plain mihomo core (named pipe or TCP
+controller, TUN on or off, different proxy ports, with or without PyYAML), from mainland China, on English
+and Chinese Windows; 0.1.1's fixes have passed the automated tests only. macOS: the builds pass the automated
+test against a stand-in mihomo, but haven't been tried with a real client.
 
 ## Reporting a problem
 

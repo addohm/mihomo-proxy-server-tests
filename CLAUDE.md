@@ -385,7 +385,9 @@ Planned features and decisions live in `ROADMAP.md` — keep it updated; don't s
 user says so.
 
 - **v0.1.0 released 2026-10-21** (user's go-ahead; repo public; CI green on all four systems; the four
-  downloads match `SHA256SUMS.txt`). All ten roadmap steps done. Next release: bump `__version__` in
+  downloads match `SHA256SUMS.txt`). All ten roadmap steps done. **v0.1.1 released 2026-10-30** (the
+  fixes below; the user said "release it" knowing they were checked offline and by CI only: no test
+  server, so no matrix and no Windows run this time). Next release: bump `__version__` in
   `mihomotest/__init__.py`, run the matrix (Linux) and a Windows check, push, then tag `vX.Y.Z` (must equal
   `__version__`) — the matrix and the Windows check need a test server again (see "Remote test server").
   Nothing in progress; ask the user what's next.
@@ -394,8 +396,9 @@ user says so.
   races (select after restore, Stop during pinging / tracing, dropped in-progress result), Linux ping in
   other languages (`LC_ALL=C`), owners() on a host name, tracert headers that start with the target,
   proxy address with `allow-lan` off, report folder fallback by trying, a locked `baseline.csv`, bad
-  `--filter`, 0-column terminals, GUI size/time checks and server re-list per run. Checked offline only
-  (fakes, no mihomo) so far: CI after the push, then the matrix and a Windows GUI run before a release.
+  `--filter`, 0-column terminals, GUI size/time checks and server re-list per run. Checked offline (fakes,
+  no mihomo) and by CI (green on all four); released as v0.1.1. Still owed once there's a test server:
+  the matrix and a Windows GUI run (Stop during a test and during pinging, `--trace`).
 - **2026-10-21, user's decisions:** the repo stayed private at first; **it's public since later on
   2026-10-21** (user), so CI runs on every push again. No release (tag) without the user's go-ahead. **macOS isn't a
   priority**: keep its code and CI build, but no extra macOS work or testing.

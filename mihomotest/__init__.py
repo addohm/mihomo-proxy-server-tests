@@ -5,4 +5,4 @@ the run loop), report (Markdown/CSV), cli (the terminal interface). The run loop
 events, so any interface can show it.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

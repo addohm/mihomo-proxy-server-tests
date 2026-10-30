@@ -20,7 +20,7 @@ nothing here is started until the user says so. Done items are removed (see git 
    "it tested well"); double-click → GUI came with step 10
 10. ~~Packaging + releases~~ — done: built 2026-10-19, **v0.1.0 released 2026-10-21**
    (https://github.com/addohm/mihomo-proxy-server-tests/releases/tag/v0.1.0; four builds + SHA256SUMS.txt,
-   checksums verified after download)
+   checksums verified after download); **v0.1.1** (bug fixes from a review) released 2026-10-30
 
 Order decided 2026-10-16: `--trace` waits until the China tester and the Windows work are done.
 
